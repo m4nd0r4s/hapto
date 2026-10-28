@@ -13,8 +13,11 @@
 //! That is the whole difference, and everything else follows from it. See
 //! `docs/why.md` for why this could not be a layer on top of the timeline.
 
+pub mod build;
+pub mod demos;
 pub mod figure;
 
+pub use build::{colour, Build, Num, Style};
 pub use figure::{Figure, Size};
 
 use std::collections::BTreeMap;

@@ -18,7 +18,7 @@ use kinemo_layout::Layout;
 use kinemo_render::raster::{rasterize, Image};
 use kinemo_render::{display_list_with, FrameSize};
 
-use crate::{State, Value};
+use crate::{Domain, Knob, State, Value};
 
 /// Where the figure is drawn, in pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +41,8 @@ pub struct Figure {
     scene: Scene,
     /// Which signal each named value writes to.
     bindings: Vec<(String, u32)>,
+    /// A built figure carries its own values; an imported one is given them.
+    state: State,
 }
 
 impl Figure {
@@ -49,7 +51,80 @@ impl Figure {
         Figure {
             scene,
             bindings: Vec::new(),
+            state: State::new(),
         }
+    }
+
+    /// A figure from a scene hapto built, with its values already named.
+    ///
+    /// This is the ordinary way to make one. Importing kinemo's JSON works
+    /// for a single knob and no more, because a bare `k.signal(...)` has no
+    /// name; a built scene names every value it declares.
+    pub fn built(built: (Scene, std::collections::BTreeMap<String, u32>)) -> Self {
+        let (scene, values) = built;
+        let mut state = State::new();
+        // A built scene declared each value with a starting number, so the
+        // figure can hold its own state and be drawn without one being
+        // assembled first.
+        for (name, signal) in &values {
+            let at = scene
+                .signals
+                .iter()
+                .find(|s| s.id == *signal)
+                .map(|s| s.initial.as_f64())
+                .unwrap_or(0.0);
+            state.declare(Knob {
+                name: name.clone(),
+                // Wide by default: a figure's author bounds a value when it
+                // has a meaningful range, and `State::set` is what narrows it.
+                domain: Domain::Number {
+                    low: at - 50.0,
+                    high: at + 50.0,
+                    step: None,
+                },
+                value: Value::number(at),
+                label: String::new(),
+            });
+        }
+        Figure {
+            scene,
+            bindings: values.into_iter().collect(),
+            state,
+        }
+    }
+
+    /// Bound a value, so a control for it has a range and a bad set is refused.
+    pub fn bound(&mut self, name: &str, low: f64, high: f64) -> Result<(), String> {
+        let at = self
+            .state
+            .number(name)
+            .ok_or_else(|| format!("this figure has no value named \"{name}\""))?;
+        self.state.declare(Knob {
+            name: name.to_string(),
+            domain: Domain::Number {
+                low,
+                high,
+                step: None,
+            },
+            value: Value::number(at.clamp(low, high)),
+            label: String::new(),
+        });
+        Ok(())
+    }
+
+    /// Set one of the figure's own values.
+    pub fn set(&mut self, name: &str, value: Value) -> Result<(), String> {
+        self.state.set(name, value)
+    }
+
+    /// Draw with the figure's own state.
+    pub fn draw_now(&self, size: Size) -> Result<Image, String> {
+        self.draw(&self.state, size)
+    }
+
+    /// The figure's own state, for a page that wants to read it.
+    pub fn state(&self) -> &State {
+        &self.state
     }
 
     /// Read a scene from the JSON kinemo emits (`scene.builder.to_json()`).

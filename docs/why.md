@@ -186,6 +186,41 @@ name, so two of them cannot be told apart. It is the first concrete reason for
 hapto to build its own scenes rather than import kinemo's, and it belongs in
 the authoring API rather than in a workaround here.
 
+## What building the scenes taught
+
+`Build` answered that: every value is declared with a name, so a mass-spring
+can carry an `x` and a `k` at once. The demos in `demos.rs` are four figures
+a textbook actually wants — a mass on a spring, two columns and the area they
+span, a tangent on a curve, a ray and its components.
+
+Three of kinemo's defaults are tuned for a scene its own Python assembled, and
+each one produced a *silently blank* picture rather than an error:
+
+1. **`presence` is empty by default and `present` starts at `false`.** An
+   object with no toggle is never on screen. All six demos rendered an empty
+   frame while the suite stayed green.
+
+2. **`fill_opacity` defaults to `0.0`.** A shape given a fill colour and
+   nothing else is painted fully transparent. The dot on the parabola was
+   absent for this reason, and only the block survived because it happened to
+   set an opacity explicitly.
+
+3. **Stroke width is not in scene units.** The renderer scales it separately,
+   so kinemo's own scenes use 1.5 to 4 where positions run -8 to 8. Widths
+   chosen on the scale of the coordinates come out invisible. `weight::HAIR`,
+   `LINE` and `HEAVY` are those numbers under names.
+
+The lesson is about verification, not about kinemo. A green suite that
+compares one frame to another passes two blank frames just as happily, and
+every one of these was found by *looking at a PNG*. `tests/shows.rs` now
+counts painted pixels and asserts that setting a value changes them; the
+`demo` example exists to be looked at.
+
+The remaining gap in the builder is `Expr`: it can build a `Vec2` but not a
+list, so a polygon's corners cannot each follow a value. `point_list` returns
+an error saying so, and `quad` draws a four-sided shape as four lines whose
+endpoints are ordinary bound signals. That is what the parallelogram is.
+
 ## The open questions
 
 These need answering before much more code:
