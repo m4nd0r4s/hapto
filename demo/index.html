@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hapto — a figure that reacts</title>
+<style>
+  :root {
+    --bg: #fdfdfc; --fg: #1c1b19; --muted: #6b6762;
+    --rule: #e4e1dc; --accent: #a0522d; --accent-soft: #f6efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15140f; --fg: #e8e4dc; --muted: #9b958a;
+      --rule: #302d26; --accent: #d08b5e; --accent-soft: #241d16;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.7 Georgia, "Iowan Old Style", "Times New Roman", serif;
+    display: flex; justify-content: center; padding: 3rem 1rem 5rem;
+  }
+  main { width: 100%; max-width: 46rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .3rem; }
+  .sub { color: var(--muted); font-size: 14px;
+    font-family: system-ui, sans-serif; margin: 0 0 2rem; }
+  p { margin: 0 0 1.1rem; }
+  /* A word in the prose that sets the value: the whole point of the library. */
+  .at {
+    color: var(--accent); background: var(--accent-soft);
+    padding: .08em .35em; border-radius: 4px; cursor: pointer;
+    border-bottom: 1px dashed var(--accent);
+  }
+  figure { margin: 2rem 0 0; }
+  canvas {
+    width: 100%; height: auto; display: block;
+    border: 1px solid var(--rule); border-radius: 8px; background: #15140f;
+  }
+  .controls {
+    display: flex; align-items: center; gap: 1rem; margin-top: 1rem;
+    font-family: system-ui, sans-serif; font-size: 14px; color: var(--muted);
+  }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  output {
+    font-variant-numeric: tabular-nums; color: var(--fg);
+    min-width: 7.5rem; font-size: 15px;
+  }
+  .status { font-family: system-ui, sans-serif; font-size: 13px;
+    color: var(--muted); margin-top: .75rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A figure that reacts</h1>
+  <p class="sub">hapto — state in, drawing out. No timeline.</p>
+
+  <p>The curve below is <i>f(x) = x²</i>, and the red point sits on it. Drag the
+  slider and the point follows: nothing is playing, and no time passes between
+  one position and the next. The figure is a function of one value.</p>
+
+  <p>The prose can set it too. At <span class="at" data-x="0">x = 0</span> the
+  point is at the bottom of the curve; at <span class="at" data-x="2">x = 2</span>
+  it has climbed to 4; by <span class="at" data-x="4.5">x = 4.5</span> it is past
+  20. Hover any of those.</p>
+
+  <figure>
+    <canvas id="figure" width="960" height="540"></canvas>
+    <div class="controls">
+      <label for="x">x</label>
+      <input type="range" id="x" min="-1" max="5" step="0.06" value="2">
+      <output id="readout"></output>
+    </div>
+    <div class="status" id="status">loading…</div>
+  </figure>
+</main>
+
+<script type="module">
+import init, { Figure } from "./pkg/hapto_web.js";
+
+const canvas = document.getElementById("figure");
+const slider = document.getElementById("x");
+const readout = document.getElementById("readout");
+const status = document.getElementById("status");
+const context = canvas.getContext("2d");
+
+const started = performance.now();
+await init();
+const ir = await (await fetch("./parabola.json")).text();
+
+const figure = new Figure(ir, "x", canvas.width, canvas.height);
+figure.declare_number("x", -1, 5, 2);
+
+// The step belongs to the value, not to anything else: ask the figure.
+const step = figure.step("x");
+if (step) slider.step = step;
+
+const pixels = context.createImageData(canvas.width, canvas.height);
+let drawing = false;
+let pending = null;
+
+function draw() {
+  const at = performance.now();
+  pixels.data.set(figure.draw());
+  context.putImageData(pixels, 0, 0);
+
+  const x = figure.get("x");
+  readout.textContent = `f(${x.toFixed(2)}) = ${(x * x).toFixed(2)}`;
+  status.textContent = `drawn in ${(performance.now() - at).toFixed(0)} ms`;
+}
+
+// One draw at a time; the newest value wins. A pointer can outrun a frame,
+// and the reader should see where they are, not every place they passed.
+function set(value) {
+  if (drawing) { pending = value; return; }
+  drawing = true;
+  requestAnimationFrame(() => {
+    figure.set("x", value);
+    slider.value = figure.get("x");
+    draw();
+    drawing = false;
+    if (pending !== null) { const next = pending; pending = null; set(next); }
+  });
+}
+
+slider.addEventListener("input", (event) => set(Number(event.target.value)));
+
+for (const word of document.querySelectorAll(".at")) {
+  const value = Number(word.dataset.x);
+  word.addEventListener("pointerenter", () => set(value));
+  word.addEventListener("click", () => set(value));
+}
+
+draw();
+status.textContent = `ready in ${(performance.now() - started).toFixed(0)} ms`;
+</script>
+</body>
+</html>

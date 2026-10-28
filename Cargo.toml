@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/hapto-core"]
+members = ["crates/hapto-core", "crates/hapto-web"]
 resolver = "2"
 
 [workspace.package]
@@ -29,3 +29,10 @@ kinemo-render = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[profile.web]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

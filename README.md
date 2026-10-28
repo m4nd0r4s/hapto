@@ -52,6 +52,21 @@ let that happen again.)
 cargo test
 ```
 
+## In the browser
+
+```bash
+scripts/build_web.sh
+```
+
+Then open <http://localhost:8750/>. A parabola with a point on it: drag the
+slider and the point follows, and hovering `x = 0` or `x = 4.5` *in the
+sentence* moves it too. That second one is the whole reason the library
+exists — a figure the prose can drive.
+
+Each redraw takes 2–5 ms, so a pointer never outruns it. Needs the
+`wasm32-unknown-unknown` target and `wasm-bindgen` at the pinned version; the
+script says so if either is missing.
+
 ## Licence
 
 MIT or Apache-2.0, at your option. Same as kinemo.

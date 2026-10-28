@@ -1,0 +1,20 @@
+[package]
+name = "hapto-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "A figure in the browser: state in, pixels out."
+
+# A cdylib for the page, an rlib so the workspace can still check it natively.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hapto-core.workspace = true
+kinemo-render.workspace = true
+serde_json.workspace = true
+# Pinned to the version kinemo pins, because the CLI that generates the
+# bindings has to match the crate exactly.
+wasm-bindgen = "=0.2.129"
