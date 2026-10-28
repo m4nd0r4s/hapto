@@ -10,5 +10,10 @@ description = "State in, drawing out: the core of a figure that reacts."
 [dependencies]
 kinemo-ir.workspace = true
 kinemo-eval.workspace = true
+kinemo-layout.workspace = true
+kinemo-render.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+kinemo-render.workspace = true

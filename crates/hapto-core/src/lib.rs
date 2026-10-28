@@ -13,6 +13,10 @@
 //! That is the whole difference, and everything else follows from it. See
 //! `docs/why.md` for why this could not be a layer on top of the timeline.
 
+pub mod figure;
+
+pub use figure::{Figure, Size};
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
