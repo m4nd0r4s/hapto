@@ -163,9 +163,32 @@ part.
 
 The third row is ours and genuinely new: it is about teaching, not drawing.
 
+## What the first figure taught
+
+Building it confirmed the reuse and turned up one constraint worth knowing.
+
+**The IR needs no timeline.** Every property of every object is a signal id,
+and a signal is an initial value plus a list of keyframes. The parabola scene
+has 806 signals and 694 of them sit on an empty timeline: they simply hold
+their initial value. So a figure is drawn by writing the state into those
+initial values and rendering at `t = 0`. `render_frame`'s `t` is never
+advanced.
+
+**A figure has to be built around a free signal.** Binding the state to the
+dot's own `x` did nothing, and a test caught it: `place(at=curve.point_at(3.0))`
+is a constraint that recomputes `x` from the constant 3.0, discarding whatever
+was written there. The value has to be a bare `k.signal(...)` that no object
+owns, so everything derived from it recomputes. `Figure::bind_free` finds it
+by that absence of an owner.
+
+That works for one knob and does not generalise: kinemo gives a bare signal no
+name, so two of them cannot be told apart. It is the first concrete reason for
+hapto to build its own scenes rather than import kinemo's, and it belongs in
+the authoring API rather than in a workaround here.
+
 ## The open questions
 
-These need answering before any code:
+These need answering before much more code:
 
 1. **Does `kinemo-eval` need splitting?** The clean move is `kinemo-expr` (the
    tracer and the ops, time-free) and `kinemo-timeline` on top. Taking all of
