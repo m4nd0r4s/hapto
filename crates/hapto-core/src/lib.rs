@@ -41,7 +41,9 @@ impl Value {
     }
 
     pub fn choice(option: impl Into<String>) -> Self {
-        Value::Choice { option: option.into() }
+        Value::Choice {
+            option: option.into(),
+        }
     }
 
     pub fn point(x: f64, y: f64) -> Self {
@@ -71,9 +73,18 @@ pub enum Domain {
     /// kinemo derived a slider's step from a question's answer tolerance,
     /// which gave a two-position slider whenever the tolerance was wide. Here
     /// the step belongs to the value, because it is a property of the value.
-    Number { low: f64, high: f64, step: Option<f64> },
-    Choice { options: Vec<String> },
-    Point { low: (f64, f64), high: (f64, f64) },
+    Number {
+        low: f64,
+        high: f64,
+        step: Option<f64>,
+    },
+    Choice {
+        options: Vec<String>,
+    },
+    Point {
+        low: (f64, f64),
+        high: (f64, f64),
+    },
     Flag,
 }
 
@@ -183,7 +194,11 @@ mod tests {
     fn number(name: &str, low: f64, high: f64, at: f64) -> Knob {
         Knob {
             name: name.into(),
-            domain: Domain::Number { low, high, step: None },
+            domain: Domain::Number {
+                low,
+                high,
+                step: None,
+            },
             value: Value::number(at),
             label: String::new(),
         }
@@ -211,7 +226,11 @@ mod tests {
         // kinemo's player derived the step from a question's tolerance, and a
         // wide tolerance gave a slider with two positions. A hundredth of the
         // range is the floor here.
-        let domain = Domain::Number { low: 2.0, high: 8.0, step: None };
+        let domain = Domain::Number {
+            low: 2.0,
+            high: 8.0,
+            step: None,
+        };
         let step = domain.step().unwrap();
         assert!((8.0 - 2.0) / step >= 100.0, "step {step} is too coarse");
     }
@@ -228,7 +247,9 @@ mod tests {
         let mut state = State::new();
         state.declare(Knob {
             name: "mode".into(),
-            domain: Domain::Choice { options: vec!["free".into(), "damped".into()] },
+            domain: Domain::Choice {
+                options: vec!["free".into(), "damped".into()],
+            },
             value: Value::choice("free"),
             label: String::new(),
         });
