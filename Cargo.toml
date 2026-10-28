@@ -1,0 +1,31 @@
+[workspace]
+members = ["crates/hapto-core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/m4nd0r4s/hapto"
+# Not on crates.io yet: the API is still being found.
+publish = false
+
+[workspace.dependencies]
+hapto-core = { path = "crates/hapto-core" }
+
+# kinemo's drawing crates, pinned to a commit. They are `publish = false` and
+# depend on each other by path, which Cargo rewrites inside a git dependency:
+# `cargo check` on exactly this resolves and builds.
+#
+# What is taken: text shaping, maths typeset without a TeX installation,
+# constraint layout, the renderer, and the expression evaluator.
+# What is left behind: the timeline. See docs/why.md.
+kinemo-ir = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+kinemo-eval = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+kinemo-layout = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+kinemo-text = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+kinemo-math = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+kinemo-render = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
