@@ -37,6 +37,7 @@ impl Default for Size {
 }
 
 /// A drawing whose numbers come from state rather than from a clock.
+#[derive(Debug, Clone)]
 pub struct Figure {
     scene: Scene,
     /// Which signal each named value writes to.

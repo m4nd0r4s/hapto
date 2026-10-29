@@ -92,45 +92,48 @@ impl Num {
         self.clone().times(self)
     }
 
-    pub fn negated(self) -> Num {
+    /// `self` to a power, which a curve like `x**2 - 2*x` needs.
+    pub fn pow(self, other: impl Into<Num>) -> Num {
+        self.bin(BinOp::Pow, other.into())
+    }
+
+    pub fn min(self, other: impl Into<Num>) -> Num {
+        self.bin(BinOp::Min, other.into())
+    }
+
+    pub fn max(self, other: impl Into<Num>) -> Num {
+        self.bin(BinOp::Max, other.into())
+    }
+
+    /// One unary op, folded now when what it reads is already a number.
+    fn un(self, f: UnOp, fold: fn(f64) -> f64) -> Num {
         match self.is_fixed() {
-            Some(n) => Num::Fixed(-n),
+            Some(n) => Num::Fixed(fold(n)),
             None => Num::Of(Expr::Un {
-                f: UnOp::Neg,
+                f,
                 a: Box::new(self.expr()),
             }),
         }
+    }
+
+    pub fn negated(self) -> Num {
+        self.un(UnOp::Neg, |n| -n)
     }
 
     pub fn abs(self) -> Num {
-        match self.is_fixed() {
-            Some(n) => Num::Fixed(n.abs()),
-            None => Num::Of(Expr::Un {
-                f: UnOp::Abs,
-                a: Box::new(self.expr()),
-            }),
-        }
+        self.un(UnOp::Abs, f64::abs)
     }
 
     pub fn sin(self) -> Num {
-        Num::Of(Expr::Un {
-            f: UnOp::Sin,
-            a: Box::new(self.expr()),
-        })
+        self.un(UnOp::Sin, f64::sin)
     }
 
     pub fn cos(self) -> Num {
-        Num::Of(Expr::Un {
-            f: UnOp::Cos,
-            a: Box::new(self.expr()),
-        })
+        self.un(UnOp::Cos, f64::cos)
     }
 
     pub fn sqrt(self) -> Num {
-        Num::Of(Expr::Un {
-            f: UnOp::Sqrt,
-            a: Box::new(self.expr()),
-        })
+        self.un(UnOp::Sqrt, f64::sqrt)
     }
 }
 
@@ -363,6 +366,21 @@ impl Build {
             drawn.push(self.line(a, b, style.clone()));
         }
         drawn
+    }
+
+    /// What a `Num` works out to right now, with the values where they sit.
+    ///
+    /// A `Num` is an expression, not a number, so nothing can read one
+    /// directly. This binds it to a signal and asks kinemo's evaluator, which
+    /// is the same machinery that draws — so a figure and a number printed
+    /// beside it cannot disagree about what a formula says.
+    pub fn probe(&mut self, n: Num) -> f64 {
+        let id = self.number(n);
+        let index = std::sync::Arc::new(kinemo_eval::TimelineIndex::new(&self.scene));
+        let evaluator = kinemo_eval::Evaluator::with_index(&self.scene, index);
+        // A formula reads signals and nothing else, so there is no layout to
+        // resolve against: `NoResolver` is the whole context it needs.
+        evaluator.signal(id, 0.0, &kinemo_eval::NoResolver).as_f64()
     }
 
     /// The scene, ready to draw, and where each named value lives.
