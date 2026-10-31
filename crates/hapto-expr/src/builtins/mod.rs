@@ -9,6 +9,7 @@
 mod basic;
 mod calculus;
 mod list;
+mod matrix;
 #[cfg(test)]
 pub(crate) mod testing;
 mod vector;
@@ -148,6 +149,7 @@ pub fn library() -> &'static [Builtin] {
         all.extend_from_slice(vector::BUILTINS);
         all.extend_from_slice(list::BUILTINS);
         all.extend_from_slice(calculus::BUILTINS);
+        all.extend_from_slice(matrix::BUILTINS);
         all
     })
 }

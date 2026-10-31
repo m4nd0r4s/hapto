@@ -64,7 +64,6 @@ pub fn apply(a: &Matrix, v: [f64; 2]) -> Option<[f64; 2]> {
     })
 }
 
-#[allow(dead_code)] // the matrix builtins (§4.6.7) are its caller
 pub fn transpose(a: &Matrix) -> Matrix {
     let mut data = vec![0.0; a.rows * a.cols];
     for i in 0..a.rows {
@@ -116,7 +115,6 @@ pub fn inverse(a: &Matrix) -> Option<Matrix> {
 }
 
 /// Determinant by elimination with partial pivoting.
-#[allow(dead_code)] // the matrix builtins (§4.6.7) are its caller
 pub fn det(a: &Matrix) -> Option<f64> {
     if a.rows != a.cols {
         return None;
