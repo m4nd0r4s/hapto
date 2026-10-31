@@ -20,8 +20,10 @@ pub mod ast;
 pub mod builtins;
 pub mod check;
 pub mod error;
+pub mod eval;
 pub mod ir;
 pub mod lexer;
+mod linalg;
 pub mod module;
 pub mod parser;
 pub mod span;
@@ -31,6 +33,7 @@ pub mod value;
 
 pub use ast::Expr;
 pub use error::{Code, Error, Severity};
+pub use eval::{Cache, Env, Evaluation};
 pub use module::{Declarations, Module};
 pub use parser::parse;
 pub use span::Span;
