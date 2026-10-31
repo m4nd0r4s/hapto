@@ -7,6 +7,8 @@ use kinemo_render::raster::Image;
 use crate::codes;
 use crate::document::marks::kind;
 use crate::document::Dash;
+use crate::geom::{clip_polygon, clip_polyline};
+use crate::layout::{draw_axes, frames, Frame};
 use crate::program::{Compiled, CompiledMark, CompiledStyle, Program};
 use crate::scene::{rasterise, Builder, Canvas, Paint};
 use crate::state::{Admitted, Input};
@@ -14,25 +16,6 @@ use crate::theme::Theme;
 
 /// The most mark instances a figure draws after `repeat` (§19.3).
 pub const MAX_INSTANCES: usize = 5000;
-
-/// Data coordinates onto a rectangle of CSS pixels.
-#[derive(Debug, Clone, Copy)]
-pub struct Mapping {
-    pub x: (f64, f64),
-    pub y: (f64, f64),
-    /// left, top, width, height in CSS px.
-    pub rect: [f64; 4],
-}
-
-impl Mapping {
-    pub fn to_css(&self, p: [f64; 2]) -> [f64; 2] {
-        let [l, t, w, h] = self.rect;
-        [
-            l + (p[0] - self.x.0) / (self.x.1 - self.x.0) * w,
-            t + h - (p[1] - self.y.0) / (self.y.1 - self.y.0) * h,
-        ]
-    }
-}
 
 /// A figure: its program, its let cache, and nothing else that moves.
 pub struct Figure {
@@ -78,14 +61,40 @@ impl Figure {
         };
         let mut ev = Evaluation::new(&self.program.module, env, &mut self.cache, DEFAULT_FUEL);
         let mut b = Builder::new(canvas, theme.bg());
-        let mapping = view_mapping(&self.program, &mut ev, canvas)?;
+        let mut ranges = Vec::new();
+        for (x, y) in &self.program.axes {
+            ranges.push((range(&mut ev, &x.range)?, range(&mut ev, &y.range)?));
+        }
+        let doc = &self.program.doc;
+        let placed = frames(
+            &doc.views,
+            &doc.layout,
+            &ranges,
+            canvas.css_width,
+            canvas.css_height,
+        );
+        for (view, frame) in doc.views.iter().zip(&placed) {
+            draw_axes(&mut b, view, frame, theme);
+        }
         let mut drawn = 0usize;
         for (z, m) in self.program.marks.iter().enumerate() {
+            let Some((view, frame)) = doc
+                .views
+                .iter()
+                .zip(&placed)
+                .find(|(v, _)| m.source.common.view.as_ref().is_none_or(|id| id == &v.id))
+            else {
+                continue;
+            };
+            let target = Target {
+                frame,
+                clip: view.clip,
+            };
             draw(
                 &mut b,
                 &mut ev,
                 m,
-                &mapping,
+                &target,
                 theme,
                 z as f64,
                 &[],
@@ -100,36 +109,20 @@ fn eval(ev: &mut Evaluation, c: &Compiled, bound: &[Value]) -> Result<Value, Err
     ev.eval(&c.checked, bound).map_err(|e| e.at_path(&c.path))
 }
 
-/// A plot area inset by a padding, over the first view's ranges.
-fn view_mapping(p: &Program, ev: &mut Evaluation, canvas: Canvas) -> Result<Mapping, Error> {
-    let Some((x, y)) = p.axes.first() else {
-        return Ok(Mapping {
-            x: (0.0, 1.0),
-            y: (0.0, 1.0),
-            rect: [0.0, 0.0, canvas.css_width, canvas.css_height],
-        });
-    };
-    let mut range = |r: &[Compiled; 2]| -> Result<(f64, f64), Error> {
-        let (lo, hi) = (eval(ev, &r[0], &[])?.num(), eval(ev, &r[1], &[])?.num());
-        // A range that has no answer at this state keeps a sane fallback.
-        Ok(if lo.is_finite() && hi.is_finite() && lo < hi {
-            (lo, hi)
-        } else {
-            (0.0, 1.0)
-        })
-    };
-    let (xr, yr) = (range(&x.range)?, range(&y.range)?);
-    let pad = 24.0f64.min(canvas.css_width / 8.0);
-    Ok(Mapping {
-        x: xr,
-        y: yr,
-        rect: [
-            pad,
-            pad,
-            canvas.css_width - 2.0 * pad,
-            canvas.css_height - 2.0 * pad,
-        ],
+/// An axis range at this state; one with no answer keeps a sane fallback.
+fn range(ev: &mut Evaluation, r: &[Compiled; 2]) -> Result<(f64, f64), Error> {
+    let (lo, hi) = (eval(ev, &r[0], &[])?.num(), eval(ev, &r[1], &[])?.num());
+    Ok(if lo.is_finite() && hi.is_finite() && lo < hi {
+        (lo, hi)
+    } else {
+        (0.0, 1.0)
     })
+}
+
+/// Where a mark draws: its view's frame, and whether it is clipped to it.
+pub struct Target<'a> {
+    pub frame: &'a Frame,
+    pub clip: bool,
 }
 
 /// Resolve a style against the kind's defaults (§9.4) and the theme.
@@ -218,7 +211,7 @@ fn draw(
     b: &mut Builder,
     ev: &mut Evaluation,
     m: &CompiledMark,
-    map: &Mapping,
+    target: &Target,
     theme: &Theme,
     z: f64,
     outer: &[Value],
@@ -231,6 +224,8 @@ fn draw(
             }
         }
         let z = m.source.common.z.unwrap_or(z);
+        let map = &target.frame.mapping;
+        let plot = map.plot;
         let main = |ev: &mut Evaluation| -> Result<Value, Error> {
             match m.main.formula() {
                 Some(c) => eval(ev, c, &bound),
@@ -262,7 +257,11 @@ fn draw(
                     dash: None,
                 };
                 let p = paint(ev, &m.style, dash, theme, defaults, &bound)?;
-                b.dot(map.to_css(at), r, &p, z);
+                let at = map.to_css(at);
+                if target.clip && !plot.grow(r).contains(at) {
+                    continue;
+                }
+                b.dot(at, r, &p, z);
             }
             "segment" | "polyline" | "polygon" => {
                 let Some(pts) = points(&main(ev)?) else {
@@ -300,7 +299,19 @@ fn draw(
                     }
                 };
                 let p = paint(ev, &m.style, dash, theme, defaults, &bound)?;
-                b.polyline(&pts, closed, &p, z);
+                if !target.clip {
+                    b.polyline(&pts, closed, &p, z);
+                } else if closed && p.fill.is_some() {
+                    b.polyline(&clip_polygon(&pts, &plot), true, &p, z);
+                } else {
+                    let mut ring = pts.clone();
+                    if closed {
+                        ring.push(pts[0]);
+                    }
+                    for run in clip_polyline(&ring, &plot) {
+                        b.polyline(&run, false, &p, z);
+                    }
+                }
             }
             other => {
                 let lands = kind(other)
@@ -366,7 +377,8 @@ marks:
         let s = f
             .scene(Canvas::new(200.0, 100.0, 1.0), &Theme::light())
             .unwrap();
-        assert_eq!(s.objects.len(), 2, "i = 0 and 2; 1 is filtered by when");
+        let dots = s.objects.iter().filter(|o| o.kind == "circle").count();
+        assert_eq!(dots, 2, "i = 0 and 2; 1 is filtered by when");
         let doc = "hapto: 2\nalt: a\nview: { x: { range: [0, 1] }, y: { range: [0, 1] } }\nmarks: [ { heatmap: 'x * y' } ]";
         let e = Figure::from_text(doc)
             .unwrap()

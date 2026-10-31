@@ -14,6 +14,8 @@
 
 pub mod codes;
 pub mod document;
+pub mod geom;
+pub mod layout;
 pub mod program;
 pub mod render;
 pub mod scene;
