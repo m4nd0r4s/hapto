@@ -17,9 +17,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::build::{colour, weight, Build, Num, Style};
-use crate::formula::parse;
-use crate::Figure;
+use crate::v1::build::{colour, weight, Build, Num, Style};
+use crate::v1::formula::parse;
+use crate::v1::Figure;
 
 /// Where a figure's axes start and stop, in the figure's own units.
 #[derive(Debug, Clone, Copy)]
@@ -295,7 +295,7 @@ pub fn columns(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Size, Value};
+    use crate::v1::{Size, Value};
 
     const SIZE: Size = Size {
         width: 320,
@@ -419,7 +419,7 @@ mod tests {
         let figure = parabola(false);
         let knob = figure.state().knobs().find(|k| k.name == "x").unwrap();
         match knob.domain {
-            crate::Domain::Number { low, high, .. } => assert_eq!((low, high), (-2.0, 4.0)),
+            crate::v1::Domain::Number { low, high, .. } => assert_eq!((low, high), (-2.0, 4.0)),
             ref other => panic!("x should be a number, and is {other:?}"),
         }
 
@@ -436,7 +436,7 @@ mod tests {
         .unwrap();
         let knob = figure.state().knobs().find(|k| k.name == "x").unwrap();
         match knob.domain {
-            crate::Domain::Number { low, high, .. } => assert_eq!((low, high), (-2.0, 6.0)),
+            crate::v1::Domain::Number { low, high, .. } => assert_eq!((low, high), (-2.0, 6.0)),
             ref other => panic!("x should be a number, and is {other:?}"),
         }
     }

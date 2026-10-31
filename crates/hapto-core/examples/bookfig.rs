@@ -4,8 +4,8 @@
 //! cargo run -p hapto-core --example bookfig
 //! ```
 
-use hapto_core::book::{columns, plot, Range};
-use hapto_core::{Size, Value};
+use hapto_core::v1::book::{columns, plot, Range};
+use hapto_core::v1::{Size, Value};
 
 fn main() -> Result<(), String> {
     let size = Size {

@@ -6,7 +6,7 @@
 //! because an object with no presence toggle is never present and kinemo
 //! drew nothing. These tests look at the pixels instead.
 
-use hapto_core::{demos, Figure, Size, Value};
+use hapto_core::v1::{demos, Figure, Size, Value};
 
 const SIZE: Size = Size {
     width: 480,

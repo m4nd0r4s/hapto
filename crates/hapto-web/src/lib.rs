@@ -4,8 +4,8 @@
 //! value when something sets one, and hands back the pixels. There is no
 //! clock here and nothing to play: `draw` is a pure function of the state.
 
-use hapto_core::book::{columns, plot, Range};
-use hapto_core::{Domain, Figure as CoreFigure, Knob, Size, State, Value};
+use hapto_core::v1::book::{columns, plot, Range};
+use hapto_core::v1::{Domain, Figure as CoreFigure, Knob, Size, State, Value};
 use wasm_bindgen::prelude::*;
 
 /// A figure a book page asks for by describing it.
@@ -192,7 +192,7 @@ impl Figure {
     ///
     /// The scene must be built around one free signal — a bare
     /// `k.signal(...)` that no object owns — which becomes the value named
-    /// `name`. See `hapto_core::Figure::bind_free`.
+    /// `name`. See `hapto_core::v1::Figure::bind_free`.
     #[wasm_bindgen(constructor)]
     pub fn new(ir: &str, name: &str, width: u32, height: u32) -> Result<Figure, JsError> {
         let mut figure = CoreFigure::from_json(ir).map_err(|e| JsError::new(&e))?;

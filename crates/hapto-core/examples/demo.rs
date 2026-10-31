@@ -8,7 +8,7 @@
 //! setting a value changed it; whether the picture *teaches* is a thing only
 //! eyes settle, and every defect worth fixing here was found this way.
 
-use hapto_core::{demos, Figure, Size};
+use hapto_core::v1::{demos, Figure, Size};
 
 fn main() -> Result<(), String> {
     let size = Size {

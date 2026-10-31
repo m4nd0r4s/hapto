@@ -18,7 +18,7 @@ use kinemo_layout::Layout;
 use kinemo_render::raster::{rasterize, Image};
 use kinemo_render::{display_list_with, FrameSize};
 
-use crate::{Domain, Knob, State, Value};
+use crate::v1::{Domain, Knob, State, Value};
 
 /// Where the figure is drawn, in pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

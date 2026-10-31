@@ -8,8 +8,8 @@
 //! The numbers that go beside a figure (an energy, a determinant) are the
 //! page's to write: it knows them, because it set the values they come from.
 
-use crate::build::{colour, weight, Build, Num, Style};
-use crate::Figure;
+use crate::v1::build::{colour, weight, Build, Num, Style};
+use crate::v1::Figure;
 
 /// A block on a spring against a wall.
 ///

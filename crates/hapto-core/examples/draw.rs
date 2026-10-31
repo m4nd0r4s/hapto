@@ -7,7 +7,7 @@
 //! Writes `hapto-x<value>.png` per value in the current directory. The dot
 //! should sit on the curve at each one, and nothing else should differ.
 
-use hapto_core::{Domain, Figure, Knob, Size, State, Value};
+use hapto_core::v1::{Domain, Figure, Knob, Size, State, Value};
 
 fn main() -> Result<(), String> {
     let values: Vec<f64> = std::env::args()

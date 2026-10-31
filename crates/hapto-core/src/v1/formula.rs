@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::build::Num;
+use crate::v1::build::Num;
 
 /// Read `text` into a number, with `values` naming what may appear in it.
 pub fn parse(text: &str, values: &BTreeMap<String, Num>) -> Result<Num, String> {
@@ -292,7 +292,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build::Build;
+    use crate::v1::build::Build;
 
     /// What a formula works out to, with `x` at a given value.
     ///

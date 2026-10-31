@@ -4,7 +4,7 @@
 //! it — exported with `scene.builder.to_json()`. hapto never advances its
 //! time; it writes the state into the signals and takes the frame at rest.
 
-use hapto_core::{Domain, Figure, Knob, Size, State, Value};
+use hapto_core::v1::{Domain, Figure, Knob, Size, State, Value};
 
 fn parabola() -> Figure {
     let json = include_str!("parabola.json");
