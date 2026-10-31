@@ -52,6 +52,24 @@ let that happen again.)
 cargo test
 ```
 
+## Where it is going
+
+hapto 2.0 is a language for any figure a book needs, and the book around
+it: a formula language, values, views and marks a figure is written in; a
+page runtime (`hapto.js`) that wires prose to figures on any HTML page; and
+a book compiler (`hapto book`) that turns Markdown into a static,
+interactive book and refuses to build one with a broken figure or link.
+
+- **`docs/SPEC-2.0.md`** — the target. Every key, mark, function, control,
+  the page runtime, the book format, the milestones and the 32-figure
+  acceptance corpus. Start here if you are building.
+- **`docs/current-state.md`** — what exists today: every primitive and its
+  limits.
+- **`docs/why.md`** — why this is a separate library and what building it
+  has taught.
+- `docs/SPEC-1.0.md` — the first target, superseded by 2.0 and kept for
+  the record.
+
 ## In the browser
 
 ```bash

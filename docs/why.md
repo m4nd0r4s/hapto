@@ -242,3 +242,31 @@ These need answering before much more code:
    time back, as a simulation rather than a script. `k.simulate` already
    exists in kinemo. This is the one place the two libraries genuinely
    overlap, and the one worth thinking hardest about.
+
+## How 2.0 answered them
+
+`docs/SPEC-2.0.md` takes a position on each, and §24 there has the full
+table of what changed.
+
+1. **Splitting `kinemo-eval`** is moot. 2.0 rebuilds the scene from state on
+   every change and evaluates formulas in hapto's own `hapto-expr`, so kinemo
+   receives literal props and hapto no longer evaluates through kinemo's
+   expression IR at all.
+2. **A figure reaches the page** as a `<hapto-figure>` custom element in light
+   DOM, and prose reaches the figure through `data-hapto-*` attributes on any
+   element. The runtime works on any HTML page; `hapto book` is one producer
+   of such pages.
+3. **The authoring surface** is a YAML or JSON document with a published
+   schema, presets for the common figures, and `hapto check`, `explain` and
+   `render` so an agent can see its own output. The Python sketch above was
+   not taken up.
+4. **A figure does not animate.** A simulation is integrated when the scene
+   is rebuilt, against no clock, and a play button is the page setting a
+   time value. The engine stays timeless.
+
+One argument above changed shape. Rust is still worth it for evaluating the
+expression in the browser, but the evaluator is no longer kinemo's tracer:
+formulas arrive as strings, not as traced Python lambdas, and a rebuild needs
+them evaluated on the host. `hapto-expr` is that evaluator, and it is small.
+What hapto takes from kinemo is the part that is genuinely hard to rebuild —
+text shaping, maths typesetting, geometry and the rasteriser.
