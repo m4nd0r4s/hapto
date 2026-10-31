@@ -63,6 +63,13 @@ pub struct CompiledStyle {
     pub halo: Option<Compiled>,
 }
 
+/// A piece of compiled text: literal, or a formula printed with a spec.
+#[derive(Debug, Clone)]
+pub enum TextPiece {
+    Lit(String),
+    Expr(Compiled, Option<String>),
+}
+
 #[derive(Debug, Clone)]
 pub struct CompiledMark {
     /// The mark as written: kind, words, dash, label text.
@@ -78,6 +85,8 @@ pub struct CompiledMark {
     pub drag: Vec<(usize, Compiled)>,
     /// Everything this mark reads, transitively.
     pub deps: Deps,
+    /// Text templates: `main` (text marks), `label`, `text` (boxes).
+    pub texts: Vec<(String, Vec<TextPiece>)>,
 }
 
 impl CompiledMark {
@@ -133,6 +142,33 @@ struct Compiler<'a> {
 }
 
 impl Compiler<'_> {
+    /// Compile a text template's interpolations (§10.2).
+    fn template(
+        &mut self,
+        template: &str,
+        path: &str,
+        bound: &[(String, Type)],
+    ) -> Option<Vec<TextPiece>> {
+        let pieces = match crate::text::parse(template, path) {
+            Ok(p) => p,
+            Err(e) => {
+                self.errors.push(e);
+                return None;
+            }
+        };
+        let mut out = Vec::new();
+        for piece in pieces {
+            out.push(match piece {
+                crate::text::Piece::Lit(l) => TextPiece::Lit(l),
+                crate::text::Piece::Expr { formula, spec } => TextPiece::Expr(
+                    self.formula(&Formula::new(formula, path), None, bound)?,
+                    spec,
+                ),
+            });
+        }
+        Some(out)
+    }
+
     fn formula(
         &mut self,
         f: &Formula,
@@ -355,6 +391,37 @@ impl Compiler<'_> {
             }
         }
 
+        let mut texts = Vec::new();
+        match (m.kind, &m.main) {
+            ("text", Arg::Text(t)) => texts.push((
+                "main".to_string(),
+                self.template(t, &format!("{}/text", m.path), &bound),
+            )),
+            ("math", Arg::Text(t)) => {
+                // TeX is static: refuse interpolation in it (E107).
+                if let Err(e) = crate::text::parse(&format!("${t}$"), &format!("{}/math", m.path)) {
+                    self.errors.push(e);
+                }
+                texts.push(("main".to_string(), Some(vec![TextPiece::Lit(t.clone())])));
+            }
+            _ => {}
+        }
+        if let Some(label) = &m.common.label {
+            texts.push((
+                "label".to_string(),
+                self.template(&label.text, &format!("{}/label", m.path), &bound),
+            ));
+        }
+        if let Some(Arg::Text(t)) = m.option("text") {
+            texts.push((
+                "text".to_string(),
+                self.template(t, &format!("{}/text", m.path), &bound),
+            ));
+        }
+        let texts: Vec<(String, Vec<TextPiece>)> = texts
+            .into_iter()
+            .filter_map(|(k, t)| t.map(|t| (k, t)))
+            .collect();
         if self.errors.len() > errors_before {
             return None;
         }
@@ -394,6 +461,7 @@ impl Compiler<'_> {
             repeat,
             drag,
             deps,
+            texts,
         })
     }
 

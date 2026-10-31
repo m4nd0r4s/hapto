@@ -3,6 +3,7 @@
 mod curves;
 mod function;
 mod lines;
+pub mod text;
 
 use hapto_expr::eval::Evaluation;
 use hapto_expr::{Error, Value};
@@ -156,8 +157,16 @@ impl Ctx<'_, '_> {
     }
 }
 
-/// Draw one instance of a mark.
+/// Draw one instance of a mark, then its label.
 pub fn draw(ctx: &mut Ctx) -> Result<(), Error> {
+    draw_mark(ctx)?;
+    text::label(ctx)
+}
+
+fn draw_mark(ctx: &mut Ctx) -> Result<(), Error> {
+    if text::draws(ctx.m.source.kind) {
+        return text::draw(ctx);
+    }
     if lines::draws(ctx.m.source.kind) {
         return lines::draw(ctx);
     }

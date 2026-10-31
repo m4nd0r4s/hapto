@@ -89,6 +89,8 @@ pub struct Paint {
 pub struct Builder {
     canvas: Canvas,
     scene: Scene,
+    /// Rectangles of the labels placed so far, for collision avoidance.
+    pub labels: Vec<crate::geom::Rect>,
 }
 
 impl Builder {
@@ -101,7 +103,11 @@ impl Builder {
         };
         let mut scene = Scene::new(config);
         scene.duration = 0.0;
-        Builder { canvas, scene }
+        Builder {
+            canvas,
+            scene,
+            labels: Vec::new(),
+        }
     }
 
     pub fn canvas(&self) -> Canvas {
@@ -229,24 +235,50 @@ impl Builder {
         );
     }
 
-    /// Text centred on `at`, `size` CSS px.
-    pub fn text(&mut self, text: &str, at: [f64; 2], size: f64, paint: &Paint, z: f64) {
+    /// Text centred on `at`, `size` CSS px, turned `rotate` radians, wrapped
+    /// at `wrap` CSS px when given. Laid out at size 1 and scaled, like maths,
+    /// so inline `$…$` keeps its baked layouts at any width (§10.4).
+    #[allow(clippy::too_many_arguments)]
+    pub fn text(
+        &mut self,
+        text: &str,
+        at: [f64; 2],
+        size: f64,
+        rotate: f64,
+        wrap: Option<f64>,
+        paint: &Paint,
+        z: f64,
+    ) {
         if text.is_empty() || !(at[0].is_finite() && at[1].is_finite()) {
             return;
         }
         let [x, y] = self.canvas.to_scene(at[0], at[1]);
-        let size = self.canvas.text_size(size);
-        self.object(
-            "text",
-            vec![
-                ("text", Value::Str(text.to_string())),
-                ("size", Value::Float(size)),
-                ("x", Value::Float(x)),
-                ("y", Value::Float(y)),
-            ],
-            paint,
-            z,
-        );
+        let scale = self.canvas.text_size(size) / crate::maths::SIZE;
+        let mut props = vec![
+            ("text", Value::Str(text.to_string())),
+            ("size", Value::Float(crate::maths::SIZE)),
+            ("scale", Value::Float(scale)),
+            ("x", Value::Float(x)),
+            ("y", Value::Float(y)),
+        ];
+        if rotate != 0.0 {
+            props.push(("rotate", Value::Float(rotate.to_degrees())));
+        }
+        if let Some(w) = wrap {
+            props.push(("wrap", Value::Float(w / size)));
+        }
+        self.object("text", props, paint, z);
+    }
+
+    /// The size of `text` at `size` CSS px: width, height.
+    pub fn measure(text: &str, size: f64, wrap: Option<f64>) -> [f64; 2] {
+        let opts = kinemo_text::TextOptions {
+            size: 1.0,
+            width: wrap.map(|w| w / size),
+            ..Default::default()
+        };
+        let r = kinemo_text::measure(text, &opts);
+        [(r.x1 - r.x0) * size, (r.y1 - r.y0) * size]
     }
 
     /// A TeX formula centred on `at`, `size` CSS px high. It is laid out at
@@ -425,21 +457,13 @@ mod tests {
             &fill,
             0.0,
         );
-        b.text(
-            "hapto",
-            [220.0, 75.0],
-            24.0,
-            &Paint {
-                fill: Some([0.0; 4].map(|_| 0.0)).map(|mut c| {
-                    c[3] = 1.0;
-                    c
-                }),
-                fill_opacity: 1.0,
-                opacity: 1.0,
-                ..Default::default()
-            },
-            0.0,
-        );
+        let ink_paint = Paint {
+            fill: Some([0.0, 0.0, 0.0, 1.0]),
+            fill_opacity: 1.0,
+            opacity: 1.0,
+            ..Default::default()
+        };
+        b.text("hapto", [220.0, 75.0], 24.0, 0.0, None, &ink_paint, 0.0);
         let img = rasterise(&b.finish(), c, false);
         assert!(ink(&img, [1.0; 4]) > 0.03, "ink {}", ink(&img, [1.0; 4]));
     }

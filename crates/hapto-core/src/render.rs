@@ -18,6 +18,8 @@ pub const MAX_INSTANCES: usize = 5000;
 pub struct Figure {
     pub program: Program,
     cache: Cache,
+    /// Findings of the last render, such as too many labels (W602).
+    pub warnings: Vec<Error>,
 }
 
 impl Figure {
@@ -28,7 +30,11 @@ impl Figure {
         }
         let program = Program::new(doc)?;
         let cache = Cache::new(&program.module);
-        Ok(Figure { program, cache })
+        Ok(Figure {
+            program,
+            cache,
+            warnings: Vec::new(),
+        })
     }
 
     /// Set a value through its domain, forgetting what it invalidates.
@@ -122,6 +128,16 @@ impl Figure {
                 &[],
                 &mut drawn,
             )?;
+        }
+        self.warnings.clear();
+        if b.labels.len() > 60 {
+            self.warnings.push(
+                Error::warning(
+                    crate::codes::W602,
+                    format!("this figure shows {} labels at once", b.labels.len()),
+                )
+                .hint("each label costs time on every frame; show fewer, or label on focus"),
+            );
         }
         Ok(b.finish())
     }

@@ -14,6 +14,7 @@ kinemo-ir.workspace = true
 kinemo-eval.workspace = true
 kinemo-layout.workspace = true
 kinemo-math.workspace = true
+kinemo-text.workspace = true
 kinemo-render.workspace = true
 serde.workspace = true
 serde_json.workspace = true

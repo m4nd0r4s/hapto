@@ -857,6 +857,7 @@ dependencies = [
  "kinemo-layout",
  "kinemo-math",
  "kinemo-render",
+ "kinemo-text",
  "serde",
  "serde_json",
  "yaml-rust2",
