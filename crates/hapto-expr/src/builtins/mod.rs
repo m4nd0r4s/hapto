@@ -7,6 +7,7 @@
 //! palette colours and calls user functions for the calculus builtins.
 
 mod basic;
+mod calculus;
 mod list;
 #[cfg(test)]
 pub(crate) mod testing;
@@ -146,6 +147,7 @@ pub fn library() -> &'static [Builtin] {
         all.extend_from_slice(basic::BUILTINS);
         all.extend_from_slice(vector::BUILTINS);
         all.extend_from_slice(list::BUILTINS);
+        all.extend_from_slice(calculus::BUILTINS);
         all
     })
 }
