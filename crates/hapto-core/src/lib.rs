@@ -21,6 +21,7 @@ pub mod render;
 pub mod scene;
 pub mod schema;
 pub mod state;
+pub mod style;
 pub mod theme;
 pub mod tree;
 pub mod v1;

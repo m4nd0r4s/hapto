@@ -6,12 +6,12 @@ use kinemo_render::raster::Image;
 
 use crate::codes;
 use crate::document::marks::kind;
-use crate::document::Dash;
 use crate::geom::{clip_polygon, clip_polyline};
 use crate::layout::{draw_axes, frames, Frame};
-use crate::program::{Compiled, CompiledMark, CompiledStyle, Program};
-use crate::scene::{rasterise, Builder, Canvas, Paint};
+use crate::program::{Compiled, CompiledMark, Program};
+use crate::scene::{rasterise, Builder, Canvas};
 use crate::state::{Admitted, Input};
+use crate::style;
 use crate::theme::Theme;
 
 /// The most mark instances a figure draws after `repeat` (§19.3).
@@ -86,9 +86,31 @@ impl Figure {
             else {
                 continue;
             };
+            let in_view = |other: &CompiledMark| {
+                other
+                    .source
+                    .common
+                    .view
+                    .as_ref()
+                    .is_none_or(|id| id == &view.id)
+            };
+            let series = self.program.marks[..z]
+                .iter()
+                .filter(|o| in_view(o) && style::is_series(o.source.kind))
+                .count();
+            let focus = self.program.state.focus.as_str();
+            let base = focus.split('[').next().unwrap_or("");
+            let view_has_focus = !focus.is_empty()
+                && self.program.marks.iter().filter(|o| in_view(o)).any(|o| {
+                    let c = &o.source.common;
+                    c.name.as_deref() == Some(base) || c.focus_group.as_deref() == Some(focus)
+                });
             let target = Target {
                 frame,
                 clip: view.clip,
+                series,
+                focus,
+                view_has_focus,
             };
             draw(
                 &mut b,
@@ -123,55 +145,11 @@ fn range(ev: &mut Evaluation, r: &[Compiled; 2]) -> Result<(f64, f64), Error> {
 pub struct Target<'a> {
     pub frame: &'a Frame,
     pub clip: bool,
-}
-
-/// Resolve a style against the kind's defaults (§9.4) and the theme.
-fn paint(
-    ev: &mut Evaluation,
-    s: &CompiledStyle,
-    dash: &Option<Dash>,
-    theme: &Theme,
-    defaults: Paint,
-    bound: &[Value],
-) -> Result<Paint, Error> {
-    let mut p = defaults;
-    let colour = |v: Value| match v {
-        Value::Colour(c) => Some(c),
-        _ => None,
-    };
-    if let Some(c) = &s.stroke {
-        p.stroke = colour(eval(ev, c, bound)?).or(p.stroke);
-    }
-    if let Some(c) = &s.fill {
-        p.fill = colour(eval(ev, c, bound)?).or(p.fill);
-        if p.fill_opacity == 0.0 {
-            p.fill_opacity = 1.0;
-        }
-    }
-    for (slot, target) in [
-        (&s.width, &mut p.width),
-        (&s.fill_opacity, &mut p.fill_opacity),
-        (&s.opacity, &mut p.opacity),
-    ] {
-        if let Some(c) = slot {
-            let n = eval(ev, c, bound)?.num();
-            if n.is_finite() {
-                *target = n.max(0.0);
-            }
-        }
-    }
-    p.dash = match dash {
-        Some(Dash::Dashed) => Some(vec![6.0, 4.0]),
-        Some(Dash::Dotted) => Some(vec![1.5, 3.0]),
-        Some(Dash::Pattern(d)) => Some(d.clone()),
-        Some(Dash::Solid) | None => None,
-    };
-    let _ = theme;
-    Ok(p)
-}
-
-fn token(theme: &Theme, t: &str) -> Option<[f64; 4]> {
-    theme.colour(t)
+    /// Curve-like marks before this one in its view (§9.4 colour rotation).
+    pub series: usize,
+    pub focus: &'a str,
+    /// Some mark of this view is focused, so the others fade (§12.5).
+    pub view_has_focus: bool,
 }
 
 /// The product of a mark's repeat lists, as bound values per instance.
@@ -217,7 +195,9 @@ fn draw(
     outer: &[Value],
     drawn: &mut usize,
 ) -> Result<(), Error> {
-    for bound in instances(ev, m, outer, drawn)? {
+    let repeated = !m.repeat.is_empty();
+    for (idx, bound) in instances(ev, m, outer, drawn)?.into_iter().enumerate() {
+        let index = repeated.then_some(idx);
         if let Some(w) = &m.when {
             if eval(ev, w, &bound)?.bool() != Some(true) {
                 continue;
@@ -238,9 +218,18 @@ fn draw(
                 .map(|p| p.vec().map(|q| map.to_css(q)))
                 .collect()
         };
-        let dash = &m.source.common.style.dash;
-        let fg = token(theme, "fg");
-        let accent = token(theme, "accent");
+        let paint = |ev: &mut Evaluation| {
+            style::resolve(
+                ev,
+                m,
+                theme,
+                target.series,
+                target.focus,
+                index,
+                target.view_has_focus,
+                &bound,
+            )
+        };
         match m.source.kind {
             "point" => {
                 let Some(at) = main(ev)?.vec() else { continue };
@@ -248,15 +237,7 @@ fn draw(
                     Some(c) => eval(ev, c, &bound)?.num(),
                     None => 5.0,
                 };
-                let defaults = Paint {
-                    fill: accent,
-                    fill_opacity: 1.0,
-                    stroke: Some(theme.bg()),
-                    width: 1.5,
-                    opacity: 1.0,
-                    dash: None,
-                };
-                let p = paint(ev, &m.style, dash, theme, defaults, &bound)?;
+                let p = paint(ev)?;
                 let at = map.to_css(at);
                 if target.clip && !plot.grow(r).contains(at) {
                     continue;
@@ -275,30 +256,7 @@ fn draw(
                         Some(c) => eval(ev, c, &bound)?.bool() == Some(true),
                         None => false,
                     };
-                let defaults = if m.source.kind == "polygon" {
-                    Paint {
-                        fill: accent,
-                        fill_opacity: 0.18,
-                        stroke: None,
-                        width: 2.0,
-                        opacity: 1.0,
-                        dash: None,
-                    }
-                } else {
-                    Paint {
-                        stroke: if m.source.kind == "segment" {
-                            fg
-                        } else {
-                            accent
-                        },
-                        width: 2.0,
-                        fill: None,
-                        fill_opacity: 0.0,
-                        opacity: 1.0,
-                        dash: None,
-                    }
-                };
-                let p = paint(ev, &m.style, dash, theme, defaults, &bound)?;
+                let p = paint(ev)?;
                 if !target.clip {
                     b.polyline(&pts, closed, &p, z);
                 } else if closed && p.fill.is_some() {
@@ -396,5 +354,54 @@ marks:
             .render(Canvas::new(100.0, 50.0, 1.0), &Theme::light())
             .unwrap_err();
         assert_eq!(e.code.0, "E604");
+    }
+
+    /// The thickness lesson: a stroke width that is a formula follows its value.
+    #[test]
+    fn a_width_formula_follows_its_value() {
+        let doc = "hapto: 2\nalt: a\nvalues: [ { name: k, type: number, range: [0, 1], default: 0 } ]\nview: { x: { range: [0, 1] }, y: { range: [0, 1] }, axes: none }\nmarks: [ { segment: '[[0.1, 0.5], [0.9, 0.5]]', style: { width: '1 + 12 * k' } } ]";
+        let mut f = Figure::from_text(doc).unwrap();
+        let c = Canvas::new(300.0, 150.0, 1.0);
+        let thin = ink(&f.render(c, &Theme::light()).unwrap(), Theme::light().bg());
+        f.set("k", Input::Number(1.0)).unwrap();
+        let thick = ink(&f.render(c, &Theme::light()).unwrap(), Theme::light().bg());
+        assert!(thick > thin * 5.0, "thin {thin}, thick {thick}");
+    }
+
+    #[test]
+    fn focus_highlights_one_mark_and_fades_the_rest() {
+        let doc = "hapto: 2\nalt: a\nview: { x: { range: [0, 1] }, y: { range: [0, 1] }, axes: none }\nmarks:\n  - { segment: '[[0.1, 0.3], [0.9, 0.3]]', name: a }\n  - { segment: '[[0.1, 0.7], [0.9, 0.7]]', name: b }";
+        let mut f = Figure::from_text(doc).unwrap();
+        let c = Canvas::new(200.0, 100.0, 1.0);
+        let theme = Theme::light();
+        let px = |img: &kinemo_render::raster::Image, x: u32, y: u32| {
+            let i = ((y * img.width + x) * 4) as usize;
+            [img.rgba[i], img.rgba[i + 1], img.rgba[i + 2]]
+        };
+        let plain = f.render(c, &theme).unwrap();
+        f.program.state.focus = "a".into();
+        let focused = f.render(c, &theme).unwrap();
+        // Find the rows the two segments sit on: the darkest pixel per half.
+        let row_of = |img: &kinemo_render::raster::Image, top: u32, bottom: u32| {
+            (top..bottom)
+                .min_by_key(|y| px(img, 100, *y).iter().map(|v| *v as u32).sum::<u32>())
+                .unwrap()
+        };
+        let (ya, yb) = (row_of(&plain, 50, 100), row_of(&plain, 0, 50));
+        let hl = theme
+            .colour("highlight")
+            .unwrap()
+            .map(|v| (v * 255.0).round() as i32);
+        let got = px(&focused, 100, ya);
+        assert!(
+            (0..3).all(|i| (got[i] as i32 - hl[i]).abs() < 40),
+            "focused mark is the highlight colour: {got:?}"
+        );
+        let faded = px(&focused, 100, yb).iter().map(|v| *v as u32).sum::<u32>();
+        let solid = px(&plain, 100, yb).iter().map(|v| *v as u32).sum::<u32>();
+        assert!(
+            faded > solid,
+            "the unfocused mark fades toward the background"
+        );
     }
 }
