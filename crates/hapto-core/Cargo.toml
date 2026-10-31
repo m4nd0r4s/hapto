@@ -13,13 +13,19 @@ yaml-rust2.workspace = true
 kinemo-ir.workspace = true
 kinemo-eval.workspace = true
 kinemo-layout.workspace = true
+kinemo-math.workspace = true
 kinemo-render.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
 kinemo-render.workspace = true
-# Only the M0 benchmark typesets TeX. kinemo-math's default `typeset` feature
-# pulls in typst, which takes the browser build from 1.3 MB to 11.4 MB brotli,
-# so it must stay out of the normal dependencies. See docs/m0.md.
-kinemo-math.workspace = true
+
+[features]
+# Typeset TeX natively with typst: on for the command line and book builds,
+# off for the browser, which draws layouts baked ahead of time (SPEC-2.0 §10.4).
+typeset = ["kinemo-math/typeset"]
+
+[[example]]
+name = "m0_rebuild"
+required-features = ["typeset"]

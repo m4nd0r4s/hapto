@@ -109,12 +109,14 @@ pub struct Document {
     pub marks: Vec<Mark>,
     pub readouts: Vec<Readout>,
     pub controls: Controls,
+    /// Baked TeX layouts, written by `hapto bake` or a book build (§10.4).
+    pub baked: Option<String>,
 }
 
 /// Every top-level key of the format (§6.2).
 pub const KEYS: &[&str] = &[
     "hapto", "id", "title", "caption", "alt", "size", "uses", "values", "let", "compute", "layout",
-    "view", "views", "marks", "readouts", "controls", "preset",
+    "view", "views", "marks", "readouts", "controls", "preset", "baked",
 ];
 
 /// Read a document; on failure, every error it has.
@@ -315,7 +317,9 @@ fn read_tree(r: &mut Reader, tree: &Tree) -> Option<Document> {
         },
     };
 
+    let baked = text(r, "baked", "the baked layouts");
     Some(Document {
+        baked,
         id,
         title,
         caption,

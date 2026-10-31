@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use kinemo_eval::{Evaluator, TimelineIndex};
-use kinemo_ir::{Object, Scene, SceneConfig, Signal, Value};
+use kinemo_ir::{Lerp, Object, Scene, SceneConfig, Signal, Value};
 use kinemo_layout::Layout;
 use kinemo_render::raster::{rasterize, Image};
 use kinemo_render::{display_list_with, FrameSize};
@@ -249,6 +249,70 @@ impl Builder {
         );
     }
 
+    /// A TeX formula centred on `at`, `size` CSS px high. It is laid out at
+    /// size 1 and scaled, so baked layouts match at any figure width (§10.4).
+    pub fn math(
+        &mut self,
+        tex: &str,
+        at: [f64; 2],
+        size: f64,
+        display: bool,
+        colour: [f64; 4],
+        z: f64,
+    ) {
+        if tex.is_empty() || !(at[0].is_finite() && at[1].is_finite()) {
+            return;
+        }
+        let [x, y] = self.canvas.to_scene(at[0], at[1]);
+        let math_id = self.scene.objects.len() as u32;
+        let rest_id = math_id + 1;
+        let mut props = BTreeMap::new();
+        for (name, value) in [
+            ("tex", Value::Str(tex.to_string())),
+            ("size", Value::Float(crate::maths::SIZE)),
+            ("display", Value::Bool(display)),
+            (
+                "scale",
+                Value::Float(self.canvas.text_size(size) / crate::maths::SIZE),
+            ),
+            ("x", Value::Float(x)),
+            ("y", Value::Float(y)),
+            ("z", Value::Float(z)),
+        ] {
+            let s = self.signal(value);
+            props.insert(name.to_string(), s);
+        }
+        // A `math` object draws through one `glyphs` child marked `rest`.
+        let children = self.signal(Value::List(vec![Value::Object(rest_id)]));
+        self.scene.signals[children as usize].lerp = Lerp::Layout;
+        self.scene.objects.push(Object {
+            id: math_id,
+            kind: "math".into(),
+            props,
+            children: Some(children),
+            presence: vec![(0.0, true)],
+            ..Default::default()
+        });
+        self.scene.roots.push(math_id);
+        let mut rest = BTreeMap::new();
+        for (name, value) in [
+            ("rest", Value::Bool(true)),
+            ("fill", Value::Color(colour)),
+            ("fill_opacity", Value::Float(1.0)),
+        ] {
+            let s = self.signal(value);
+            rest.insert(name.to_string(), s);
+        }
+        self.scene.objects.push(Object {
+            id: rest_id,
+            kind: "glyphs".into(),
+            parent: Some(math_id),
+            props: rest,
+            presence: vec![(0.0, true)],
+            ..Default::default()
+        });
+    }
+
     pub fn finish(self) -> Scene {
         self.scene
     }
@@ -378,5 +442,33 @@ mod tests {
         );
         let img = rasterise(&b.finish(), c, false);
         assert!(ink(&img, [1.0; 4]) > 0.03, "ink {}", ink(&img, [1.0; 4]));
+    }
+
+    /// A baked formula draws the same number of pixels high at any width.
+    #[cfg(feature = "typeset")]
+    #[test]
+    fn maths_keeps_its_pixel_size_at_two_widths() {
+        let height_of = |css_width: f64| {
+            let c = Canvas::new(css_width, 150.0, 1.0);
+            let mut b = Builder::new(c, [1.0; 4]);
+            b.math(
+                r"\frac{\partial H}{\partial q}",
+                [css_width / 2.0, 75.0],
+                24.0,
+                true,
+                [0.0, 0.0, 0.0, 1.0],
+                0.0,
+            );
+            let img = rasterise(&b.finish(), c, false);
+            let rows: Vec<u32> = (0..img.height)
+                .filter(|y| {
+                    (0..img.width).any(|x| img.rgba[((y * img.width + x) * 4) as usize] < 128)
+                })
+                .collect();
+            rows.last().unwrap() - rows.first().unwrap()
+        };
+        let (narrow, wide) = (height_of(300.0), height_of(600.0));
+        assert!(narrow > 20, "the formula drew ({narrow} px)");
+        assert!(narrow.abs_diff(wide) <= 1, "{narrow} vs {wide}");
     }
 }

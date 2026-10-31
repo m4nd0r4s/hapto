@@ -26,6 +26,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # TeX typesetting is a feature (typst): test it too.
+      - run: cargo test -p hapto-core --features typeset
 
   wasm:
     # The formula language must compute the same digits in the browser, so

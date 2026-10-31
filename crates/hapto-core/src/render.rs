@@ -23,6 +23,9 @@ pub struct Figure {
 impl Figure {
     pub fn from_text(text: &str) -> Result<Figure, Vec<Error>> {
         let doc = crate::document::read(text)?;
+        if let Some(json) = &doc.baked {
+            crate::maths::register(json).map_err(|e| vec![e])?;
+        }
         let program = Program::new(doc)?;
         let cache = Cache::new(&program.module);
         Ok(Figure { program, cache })
