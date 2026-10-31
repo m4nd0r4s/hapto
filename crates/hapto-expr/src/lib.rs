@@ -19,6 +19,7 @@
 pub mod ast;
 pub mod builtins;
 pub mod check;
+mod colour;
 pub mod deps;
 pub mod error;
 pub mod eval;
