@@ -294,6 +294,32 @@ impl Compiler<'_> {
             }
         }
         self.check_functions(m);
+        // A tangent or secant reads its function through formulas built here,
+        // so drawing never calls a function outside the evaluator.
+        if let (Some(Arg::Ident(f)), Arg::Formula(main)) = (m.option("of"), &m.main) {
+            if self.module.functions().iter().any(|func| &func.name == f) {
+                let x = &main.text;
+                let synthesized: Vec<(&str, String, Type)> = match m.kind {
+                    "tangent" => vec![
+                        ("_y", format!("{f}(({x}))"), Type::Num),
+                        ("_slope", format!("derivative({f}, ({x}))"), Type::Num),
+                    ],
+                    "secant" => vec![(
+                        "_ys",
+                        format!("[{f}(({x})[0]), {f}(({x})[1])]"),
+                        Type::list(Type::Num),
+                    )],
+                    _ => vec![],
+                };
+                for (key, text, ty) in synthesized {
+                    if let Some(c) =
+                        self.formula(&Formula::new(text, &main.path), Some(ty), &main_bound)
+                    {
+                        options.push((key.to_string(), Slot::Formula(c)));
+                    }
+                }
+            }
+        }
 
         let when = m
             .common

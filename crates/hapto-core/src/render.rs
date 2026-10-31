@@ -4,15 +4,12 @@ use hapto_expr::eval::{Cache, Env, Evaluation, DEFAULT_FUEL};
 use hapto_expr::{Error, Value};
 use kinemo_render::raster::Image;
 
-use crate::codes;
-use crate::document::marks::kind;
-use crate::geom::{clip_polygon, clip_polyline};
 use crate::layout::{draw_axes, frames, Frame};
 use crate::program::{Compiled, CompiledMark, Program};
 use crate::scene::{rasterise, Builder, Canvas};
 use crate::state::{Admitted, Input};
-use crate::style;
 use crate::theme::Theme;
+use crate::{marks, style};
 
 /// The most mark instances a figure draws after `repeat` (§19.3).
 pub const MAX_INSTANCES: usize = 5000;
@@ -197,92 +194,33 @@ fn draw(
 ) -> Result<(), Error> {
     let repeated = !m.repeat.is_empty();
     for (idx, bound) in instances(ev, m, outer, drawn)?.into_iter().enumerate() {
-        let index = repeated.then_some(idx);
         if let Some(w) = &m.when {
             if eval(ev, w, &bound)?.bool() != Some(true) {
                 continue;
             }
         }
-        let z = m.source.common.z.unwrap_or(z);
-        let map = &target.frame.mapping;
-        let plot = map.plot;
-        let main = |ev: &mut Evaluation| -> Result<Value, Error> {
-            match m.main.formula() {
-                Some(c) => eval(ev, c, &bound),
-                None => Ok(Value::Nothing),
-            }
+        let index = repeated.then_some(idx);
+        let paint = style::resolve(
+            ev,
+            m,
+            theme,
+            target.series,
+            target.focus,
+            index,
+            target.view_has_focus,
+            &bound,
+        )?;
+        let mut ctx = marks::Ctx {
+            b: &mut *b,
+            ev: &mut *ev,
+            m,
+            map: &target.frame.mapping,
+            clip: target.clip,
+            z: m.source.common.z.unwrap_or(z),
+            bound: &bound,
+            paint,
         };
-        let points = |v: &Value| -> Option<Vec<[f64; 2]>> {
-            v.items()?
-                .iter()
-                .map(|p| p.vec().map(|q| map.to_css(q)))
-                .collect()
-        };
-        let paint = |ev: &mut Evaluation| {
-            style::resolve(
-                ev,
-                m,
-                theme,
-                target.series,
-                target.focus,
-                index,
-                target.view_has_focus,
-                &bound,
-            )
-        };
-        match m.source.kind {
-            "point" => {
-                let Some(at) = main(ev)?.vec() else { continue };
-                let r = match m.option("r").and_then(|s| s.formula()) {
-                    Some(c) => eval(ev, c, &bound)?.num(),
-                    None => 5.0,
-                };
-                let p = paint(ev)?;
-                let at = map.to_css(at);
-                if target.clip && !plot.grow(r).contains(at) {
-                    continue;
-                }
-                b.dot(at, r, &p, z);
-            }
-            "segment" | "polyline" | "polygon" => {
-                let Some(pts) = points(&main(ev)?) else {
-                    continue;
-                };
-                if m.source.kind == "segment" && pts.len() != 2 {
-                    continue;
-                }
-                let closed = m.source.kind == "polygon"
-                    || match m.option("closed").and_then(|s| s.formula()) {
-                        Some(c) => eval(ev, c, &bound)?.bool() == Some(true),
-                        None => false,
-                    };
-                let p = paint(ev)?;
-                if !target.clip {
-                    b.polyline(&pts, closed, &p, z);
-                } else if closed && p.fill.is_some() {
-                    b.polyline(&clip_polygon(&pts, &plot), true, &p, z);
-                } else {
-                    let mut ring = pts.clone();
-                    if closed {
-                        ring.push(pts[0]);
-                    }
-                    for run in clip_polyline(&ring, &plot) {
-                        b.polyline(&run, false, &p, z);
-                    }
-                }
-            }
-            other => {
-                let lands = kind(other)
-                    .map(|k| k.draws_in)
-                    .unwrap_or("a later milestone");
-                return Err(Error::new(
-                    codes::E610,
-                    format!("this build does not draw `{other}` marks yet"),
-                )
-                .hint(format!("they land in milestone {lands} of SPEC-2.0 §23"))
-                .at_path(&m.source.path));
-            }
-        }
+        marks::draw(&mut ctx)?;
     }
     Ok(())
 }
@@ -342,7 +280,7 @@ marks:
             .unwrap()
             .render(Canvas::new(100.0, 50.0, 1.0), &Theme::light())
             .unwrap_err();
-        assert_eq!(e.code, codes::E610);
+        assert_eq!(e.code, crate::codes::E610);
         assert!(e.hint.unwrap().contains("M5"));
     }
 
