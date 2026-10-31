@@ -2398,7 +2398,7 @@ Codes are stable. Every code has a test that triggers it (CONTRIBUTING:
 | Range | Area | Codes |
 |---|---|---|
 | E1xx | formula syntax | `E101` unexpected token · `E102` `^` used for power · `E103` implicit multiplication · `E104` unclosed bracket · `E105` chained comparison · `E106` non-ASCII operator · `E107` interpolation inside TeX (TeX is static, §10.2) |
-| E2xx | types | `E201` type mismatch · `E202` unknown function · `E203` wrong argument count · `E204` operator not defined for these types · `E205` `if` branches differ · `E206` condition not bool |
+| E2xx | types | `E201` type mismatch · `E202` unknown function · `E203` wrong argument count · `E204` operator not defined for these types · `E205` `if` branches differ · `E206` condition not bool · `E207` no such field or method |
 | E3xx | names and scope | `E301` unknown name (with nearest names) · `E302` reserved word used as a name · `E303` illegal shadowing · `E304` cycle in lets · `E305` recursion · `E306` duplicate name |
 | E4xx | document structure | `E401` unknown key (with suggestion) · `E402` missing required key · `E403` wrong value type · `E404` unknown mark kind · `E405` unknown preset · `E406` mixing `view` and `views` · `E407` missing `hapto:` version · `E408` a mark with zero or several kind keys · `E409` mark references an unknown view |
 | E5xx | values and domains | `E501` default outside range · `E502` empty or inverted range · `E503` log range not positive · `E504` option not among options · `E505` drag assigns a value that does not exist |

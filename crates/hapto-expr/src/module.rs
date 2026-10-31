@@ -281,6 +281,7 @@ impl Module {
                                 )
                                 .in_formula(key)
                                 .at(p.span)
+                                .hint("give each parameter its own name")
                                 .at_path(&path),
                             );
                             ok = false;
