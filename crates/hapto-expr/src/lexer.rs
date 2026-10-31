@@ -217,6 +217,12 @@ impl Lexer<'_> {
             .at(span)
         })?;
 
+        if !value.is_finite() {
+            return Err(Error::new(codes::E101, "this number is too large to hold")
+                .at(span)
+                .hint("numbers must fit in a double, below about 1.8e308"));
+        }
+
         // `2x` and `2pi` are multiplications a reader sees and the grammar
         // does not: refuse them by name.
         if self
@@ -474,6 +480,11 @@ mod tests {
         assert_eq!(toks("1e-3"), vec![Tok::Number(0.001)]);
         assert_eq!(toks("6.02E23"), vec![Tok::Number(6.02e23)]);
         assert_eq!(toks("3."), vec![Tok::Number(3.0)]);
+    }
+
+    #[test]
+    fn a_number_too_large_to_hold_is_refused() {
+        assert_eq!(refused("1e999").code, codes::E101);
     }
 
     #[test]

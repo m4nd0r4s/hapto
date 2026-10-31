@@ -16,9 +16,13 @@
 // field one dereference further from the code that builds and tests it.
 #![allow(clippy::result_large_err)]
 
+pub mod ast;
 pub mod error;
 pub mod lexer;
+pub mod parser;
 pub mod span;
 
+pub use ast::Expr;
 pub use error::{Code, Error, Severity};
+pub use parser::parse;
 pub use span::Span;

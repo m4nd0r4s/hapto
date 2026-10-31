@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 17b28910da9c788379994155bf7411e16f630e4ddbf667abe14db36a3415b886 # shrinks to tree = Expr { kind: List([Expr { kind: Call { callee: Expr { kind: Name("a"), span: Span { start: 0, end: 0 } }, args: [Expr { kind: Generator(Comprehension { body: Expr { kind: Number(-0.0), span: Span { start: 0, end: 0 } }, var: Ident { name: "a", span: Span { start: 0, end: 0 } }, iter: Expr { kind: Number(0.0), span: Span { start: 0, end: 0 } }, cond: None }), span: Span { start: 0, end: 0 } }] }, span: Span { start: 0, end: 0 } }]), span: Span { start: 0, end: 0 } }
