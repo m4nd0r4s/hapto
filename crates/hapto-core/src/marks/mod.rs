@@ -1,5 +1,6 @@
 //! Drawing marks: one function per family, sharing a context (SPEC-2.0 §8).
 
+mod function;
 mod lines;
 
 use hapto_expr::eval::Evaluation;
@@ -152,6 +153,9 @@ impl Ctx<'_, '_> {
 pub fn draw(ctx: &mut Ctx) -> Result<(), Error> {
     if lines::draws(ctx.m.source.kind) {
         return lines::draw(ctx);
+    }
+    if function::draws(ctx.m.source.kind) {
+        return function::draw(ctx);
     }
     let name = ctx.m.source.kind;
     let lands = kind(name)
