@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "hapto",
+  "project_id": "d5279c96-2097-4404-8b16-6681f62844cf"
+}

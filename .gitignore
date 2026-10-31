@@ -25,3 +25,10 @@ demo/parabola.json
 
 # Written by `cargo run -p hapto-core --example demo`, to look at.
 /hapto-*.png
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*
