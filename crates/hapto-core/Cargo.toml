@@ -8,6 +8,8 @@ publish.workspace = true
 description = "State in, drawing out: the core of a figure that reacts."
 
 [dependencies]
+hapto-expr.workspace = true
+yaml-rust2.workspace = true
 kinemo-ir.workspace = true
 kinemo-eval.workspace = true
 kinemo-layout.workspace = true

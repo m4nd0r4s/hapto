@@ -7,4 +7,13 @@
 //!
 //! The 1.0 model lives in [`v1`] until the 2.0 language replaces it.
 
+// Errors (`hapto_expr::Error`) carry a message, hint, options and path, which
+// makes them large beside an `Ok`. They happen when a document is loaded, not
+// per frame, so the size costs nothing that matters.
+#![allow(clippy::result_large_err)]
+
+pub mod codes;
+pub mod document;
+pub mod schema;
+pub mod tree;
 pub mod v1;

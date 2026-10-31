@@ -29,7 +29,9 @@ kinemo-math = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc
 kinemo-render = { git = "https://github.com/m4nd0r4s/kinemo.git", rev = "4cbd012bc8ca29a53696178b9a6c8bff68602144" }
 
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+# YAML 1.2 in pure Rust, so documents parse the same natively and in wasm.
+yaml-rust2 = "0.10"
 # One implementation of sin, exp and friends on every target, so a native test
 # and the browser compute the same digits (SPEC-2.0 §3.5).
 libm = "0.2"

@@ -1017,7 +1017,7 @@ Keys every mark accepts:
 |---|---|---|---|
 | `view` | id | the only view | which view it draws in; required when there are several |
 | `name` | identifier | none | makes the mark focusable and addressable from prose (§12.5) |
-| `group` | identifier | none | a focus group several marks share |
+| `focus_group` | identifier | none | a focus group several marks share (not `group`, which is the kind of §8.14) |
 | `when` | `bool` formula | `true` | drawn only when true |
 | `style` | style map (§9) | theme default for the kind | |
 | `label` | text map or string (§10.3) | none | a label attached to the mark's anchor |
@@ -1247,7 +1247,7 @@ Any mark MAY be repeated:
 - The count MAY depend on values; that is the point.
 - Each instance's stable key is the mark path plus its indices (§3.3).
 - A `name` on a repeated mark gets the index appended (`bar[3]`), and
-  `group` stays shared, so prose can focus one bar or all of them.
+  `focus_group` stays shared, so prose can focus one bar or all of them.
 - The total number of instances in a figure is limited (§19.3); exceeding
   it is an error at check time and a truncation plus console error at
   runtime.
@@ -1723,7 +1723,7 @@ Rules:
 
 ### 12.5 Focus: hover linking between marks and prose
 
-A mark with `name` (or `group`) is **focusable**. Focus is state: the
+A mark with `name` (or `focus_group`) is **focusable**. Focus is state: the
 reserved `focus` (§5.5) holds the focused name or `""`.
 
 - **Hovering a focusable mark** in the figure sets `focus` to its name.
@@ -2400,9 +2400,9 @@ Codes are stable. Every code has a test that triggers it (CONTRIBUTING:
 | E1xx | formula syntax | `E101` unexpected token · `E102` `^` used for power · `E103` implicit multiplication · `E104` unclosed bracket · `E105` chained comparison · `E106` non-ASCII operator · `E107` interpolation inside TeX (TeX is static, §10.2) |
 | E2xx | types | `E201` type mismatch · `E202` unknown function · `E203` wrong argument count · `E204` operator not defined for these types · `E205` `if` branches differ · `E206` condition not bool · `E207` no such field or method |
 | E3xx | names and scope | `E301` unknown name (with nearest names) · `E302` reserved word used as a name · `E303` illegal shadowing · `E304` cycle in lets · `E305` recursion · `E306` duplicate name |
-| E4xx | document structure | `E401` unknown key (with suggestion) · `E402` missing required key · `E403` wrong value type · `E404` unknown mark kind · `E405` unknown preset · `E406` mixing `view` and `views` · `E407` missing `hapto:` version · `E408` a mark with zero or several kind keys · `E409` mark references an unknown view |
+| E4xx | document structure | `E400` not valid JSON or YAML · `E401` unknown key (with suggestion) · `E402` missing required key · `E403` wrong value type · `E404` unknown mark kind · `E405` unknown preset · `E406` mixing `view` and `views` · `E407` missing `hapto:` version · `E408` a mark with zero or several kind keys · `E409` mark references an unknown view |
 | E5xx | values and domains | `E501` default outside range · `E502` empty or inverted range · `E503` log range not positive · `E504` option not among options · `E505` drag assigns a value that does not exist |
-| E6xx | rendering and computation | `E601` figure renders without ink · `E602` invariant violated · `E603` repeat over limit · `E604` evaluation over budget · `E605` `verlet` on a non-separable system · `E606` unsupported TeX command · `E607` integrator step count over limit · `E608` TeX not baked (run `hapto bake`) · `E609` a mark drawn below a heat map |
+| E6xx | rendering and computation | `E601` figure renders without ink · `E602` invariant violated · `E603` repeat over limit · `E604` evaluation over budget · `E605` `verlet` on a non-separable system · `E606` unsupported TeX command · `E607` integrator step count over limit · `E608` TeX not baked (run `hapto bake`) · `E609` a mark drawn below a heat map · `E610` part of the format this build does not support yet (names the milestone) |
 | E7xx | book | `E701` binding does not resolve · `E702` ambiguous binding · `E703` `set` literal out of range · `E704` cross-reference to nothing · `E705` duplicate id · `E706` figure task solved at default · `E707` missing alt text |
 | Wxxx | warnings | `W101` float equality · `W301` value nobody can change · `W401` raw HTML · `W402` low-contrast literal colour · `W601` explicit Euler without reason · `W602` more than 60 labels on screen · `W701` `show` text disagrees with readout · `W801` legacy 1.0 document |
 
