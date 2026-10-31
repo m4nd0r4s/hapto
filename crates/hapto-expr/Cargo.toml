@@ -1,0 +1,17 @@
+[package]
+name = "hapto-expr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The formula language of hapto: parse, type-check and evaluate what a figure says."
+
+# No kinemo here: formulas are hapto's own, and the same evaluator has to give
+# the same digits natively and in the browser (SPEC-2.0 §3.5).
+[dependencies]
+libm.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

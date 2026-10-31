@@ -26,3 +26,16 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+
+  wasm:
+    # The formula language must compute the same digits in the browser, so
+    # it has to build for the browser target without kinemo or std-only code.
+    name: hapto-expr on wasm32
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p hapto-expr --target wasm32-unknown-unknown
