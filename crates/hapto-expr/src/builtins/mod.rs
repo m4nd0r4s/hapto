@@ -8,11 +8,16 @@
 
 mod basic;
 mod calculus;
+mod colours;
 mod list;
 mod matrix;
+mod probability;
 #[cfg(test)]
 pub(crate) mod testing;
 mod vector;
+
+/// The colour scale names fields and matrices accept (§9.3).
+pub use colours::SCALES;
 
 use std::sync::{Arc, OnceLock};
 
@@ -150,6 +155,8 @@ pub fn library() -> &'static [Builtin] {
         all.extend_from_slice(list::BUILTINS);
         all.extend_from_slice(calculus::BUILTINS);
         all.extend_from_slice(matrix::BUILTINS);
+        all.extend_from_slice(probability::BUILTINS);
+        all.extend_from_slice(colours::BUILTINS);
         all
     })
 }

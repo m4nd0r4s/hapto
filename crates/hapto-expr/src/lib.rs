@@ -23,6 +23,7 @@ mod colour;
 pub mod deps;
 pub mod error;
 pub mod eval;
+pub mod format;
 pub mod ir;
 pub mod lexer;
 mod linalg;
