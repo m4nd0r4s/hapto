@@ -17,3 +17,7 @@ serde_json.workspace = true
 
 [dev-dependencies]
 kinemo-render.workspace = true
+# Only the M0 benchmark typesets TeX. kinemo-math's default `typeset` feature
+# pulls in typst, which takes the browser build from 1.3 MB to 11.4 MB brotli,
+# so it must stay out of the normal dependencies. See docs/m0.md.
+kinemo-math.workspace = true
