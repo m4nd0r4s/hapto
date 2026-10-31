@@ -22,6 +22,7 @@ pub mod check;
 pub mod error;
 pub mod ir;
 pub mod lexer;
+pub mod module;
 pub mod parser;
 pub mod span;
 mod suggest;
@@ -30,6 +31,7 @@ pub mod value;
 
 pub use ast::Expr;
 pub use error::{Code, Error, Severity};
+pub use module::{Declarations, Module};
 pub use parser::parse;
 pub use span::Span;
 pub use types::Type;
