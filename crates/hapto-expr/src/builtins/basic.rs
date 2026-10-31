@@ -232,48 +232,8 @@ pub(super) const BUILTINS: &[Builtin] = &[
 
 #[cfg(test)]
 mod tests {
-    use crate::eval::{no_palette, Cache, Env, Evaluation, DEFAULT_FUEL};
-    use crate::module::{Declarations, Module};
-    use crate::types::Type;
+    use super::super::testing::{close, eval_at, nothing};
     use crate::value::Value;
-
-    /// Evaluate a formula over one value `x`.
-    pub(crate) fn eval_at(formula: &str, x: f64) -> Value {
-        let decls = Declarations {
-            values: vec![("x".into(), Type::Num)],
-            ..Default::default()
-        };
-        let mut module = Module::new(&decls).unwrap();
-        let checked = module
-            .compile(formula, &[], None)
-            .unwrap_or_else(|e| panic!("{formula}: {e} {:?}", e.hint));
-        let values = [Value::Num(x)];
-        let mut cache = Cache::new(&module);
-        let env = Env {
-            values: &values,
-            compute: &[],
-            palette: &no_palette,
-        };
-        Evaluation::new(&module, env, &mut cache, DEFAULT_FUEL)
-            .eval(&checked, &[])
-            .unwrap()
-    }
-
-    fn n(formula: &str) -> f64 {
-        eval_at(formula, 0.0).num()
-    }
-
-    fn close(formula: &str, want: f64) {
-        let got = n(formula);
-        assert!((got - want).abs() < 1e-12, "{formula} = {got}, want {want}");
-    }
-
-    fn nothing(formula: &str) {
-        assert!(
-            eval_at(formula, 0.0).is_nothing(),
-            "{formula} should be no value"
-        );
-    }
 
     #[test]
     fn constants() {

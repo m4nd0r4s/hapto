@@ -7,6 +7,9 @@
 //! palette colours and calls user functions for the calculus builtins.
 
 mod basic;
+#[cfg(test)]
+pub(crate) mod testing;
+mod vector;
 
 use std::sync::{Arc, OnceLock};
 
@@ -140,6 +143,7 @@ pub fn library() -> &'static [Builtin] {
     LIBRARY.get_or_init(|| {
         let mut all = Vec::new();
         all.extend_from_slice(basic::BUILTINS);
+        all.extend_from_slice(vector::BUILTINS);
         all
     })
 }
