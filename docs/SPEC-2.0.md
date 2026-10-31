@@ -1053,7 +1053,7 @@ type unless marked *literal*.
 | `polyline` | `list<vec>` | `closed` (bool) |
 | `polygon` | `list<vec>` | filled by default |
 | `circle` | `vec` centre | `r` (data units, required) |
-| `ellipse` | `vec` centre | `rx`, `ry`, `angle` |
+| `ellipse` | `vec` centre | `rx`, `ry`, `tilt` (radians; not `angle`, which is a mark kind) |
 | `arc` | `vec` centre | `r`, `from`, `to` (radians, counter-clockwise) |
 | `sector` | `vec` centre | `r`, `inner` (default 0), `from`, `to` |
 | `angle` | `vec` vertex | `from` (`vec`, a point on the first arm), `to` (`vec`, on the second arm), `r` (px, default 22), `right` (*literal*: `auto`, `always`, `never` — `auto` draws a square marker when the angle is within 0.5° of 90°), `reflex` (bool, default false) |

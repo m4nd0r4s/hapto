@@ -1,5 +1,6 @@
 //! Drawing marks: one function per family, sharing a context (SPEC-2.0 §8).
 
+mod curves;
 mod function;
 mod lines;
 
@@ -71,6 +72,12 @@ impl Ctx<'_, '_> {
             Some(Slot::Word(w)) => w.clone(),
             _ => default.to_string(),
         }
+    }
+
+    /// A theme colour by token, for marks that colour by meaning.
+    pub fn palette(&self, token: &str) -> Option<[f64; 4]> {
+        use hapto_expr::builtins::Host;
+        self.ev.palette(token)
     }
 
     pub fn css(&self, p: [f64; 2]) -> [f64; 2] {
@@ -156,6 +163,9 @@ pub fn draw(ctx: &mut Ctx) -> Result<(), Error> {
     }
     if function::draws(ctx.m.source.kind) {
         return function::draw(ctx);
+    }
+    if curves::draws(ctx.m.source.kind) {
+        return curves::draw(ctx);
     }
     let name = ctx.m.source.kind;
     let lands = kind(name)

@@ -212,7 +212,7 @@ pub const KINDS: &[KindSpec] = &[
         options: &[
             ("rx", Spec::F(Ty::Num)),
             ("ry", Spec::F(Ty::Num)),
-            ("angle", Spec::F(Ty::Num)),
+            ("tilt", Spec::F(Ty::Num)),
         ],
         draws_in: "M2",
     },

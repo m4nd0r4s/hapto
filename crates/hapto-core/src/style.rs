@@ -42,7 +42,9 @@ pub fn defaults(kind: &str, theme: &Theme, series: usize) -> Paint {
         dash: None,
     };
     match kind {
-        "function" | "polyline" | "trace" | "bezier" | "spring" | "arc" => {
+        // Data curves rotate through the categorical tokens; shapes do not.
+        "bezier" | "spring" | "arc" => stroke("accent", 2.0),
+        "function" | "polyline" | "trace" => {
             let token = if series == 0 {
                 "accent".to_string()
             } else {
