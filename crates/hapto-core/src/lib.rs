@@ -15,5 +15,6 @@
 pub mod codes;
 pub mod document;
 pub mod schema;
+pub mod state;
 pub mod tree;
 pub mod v1;
