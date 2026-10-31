@@ -15,7 +15,10 @@
 pub mod codes;
 pub mod document;
 pub mod program;
+pub mod render;
+pub mod scene;
 pub mod schema;
 pub mod state;
+pub mod theme;
 pub mod tree;
 pub mod v1;
