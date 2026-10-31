@@ -58,6 +58,17 @@ impl Cache {
         }
     }
 
+    /// Forget exactly the lets a change to these values or compute nodes
+    /// reaches; everything else keeps its cached value. Returns how many
+    /// were forgotten.
+    pub fn invalidate(&mut self, module: &Module, values: &[usize], compute: &[usize]) -> usize {
+        let touched = module.lets_touched_by(values, compute);
+        for &i in &touched {
+            self.forget(i);
+        }
+        touched.len()
+    }
+
     pub fn forget_all(&mut self) {
         self.lets.iter_mut().for_each(|slot| *slot = None);
     }
@@ -660,6 +671,66 @@ mod tests {
         assert_eq!(ev.eval(&checked, &[]).unwrap(), Value::Num(24.0));
         assert_eq!(ev.eval(&checked, &[]).unwrap(), Value::Num(24.0));
         assert_eq!(cache.computed, 2);
+    }
+
+    #[test]
+    fn a_change_recomputes_exactly_what_reads_it() {
+        // a and b read x; c reads p; d reads b; k reads nothing that changes.
+        let mut f = fixture(&[
+            ("a", "x * 2"),
+            ("b", "a + 1"),
+            ("c", "p.x"),
+            ("d", "b * 10"),
+            ("k", "3"),
+            ("twice(t)", "t * x"),
+            ("g", "twice(1)"),
+        ]);
+        let all = f
+            .module
+            .compile("a + b + c + d + k + g", &[], None)
+            .unwrap();
+        let mut cache = Cache::new(&f.module);
+        let eval = |cache: &mut Cache, values: &[Value]| {
+            let env = Env {
+                values,
+                compute: &[],
+                palette: &no_palette,
+            };
+            Evaluation::new(&f.module, env, cache, DEFAULT_FUEL)
+                .eval(&all, &[])
+                .unwrap()
+        };
+        assert_eq!(
+            eval(&mut cache, &f.values),
+            Value::Num(6.0 + 7.0 + 1.0 + 70.0 + 3.0 + 3.0)
+        );
+        assert_eq!(cache.computed, 6);
+
+        // x moves: a, b, d and g (through the function) are recomputed; c and k are not.
+        f.values[0] = Value::Num(4.0);
+        assert_eq!(cache.invalidate(&f.module, &[0], &[]), 4);
+        let before = cache.computed;
+        assert_eq!(
+            eval(&mut cache, &f.values),
+            Value::Num(8.0 + 9.0 + 1.0 + 90.0 + 3.0 + 4.0)
+        );
+        assert_eq!(cache.computed - before, 4);
+
+        // p moves: only c.
+        f.values[1] = Value::Vec([5.0, 0.0]);
+        assert_eq!(cache.invalidate(&f.module, &[1], &[]), 1);
+        let before = cache.computed;
+        eval(&mut cache, &f.values);
+        assert_eq!(cache.computed - before, 1);
+    }
+
+    #[test]
+    fn a_formula_knows_what_it_reads() {
+        let mut f = fixture(&[("a", "x * 2"), ("sq(t)", "t * p.y")]);
+        let checked = f.module.compile("a + sq(1)", &[], None).unwrap();
+        let deps = f.module.deps(&checked.node);
+        assert_eq!(deps.values.iter().copied().collect::<Vec<_>>(), vec![0, 1]);
+        assert_eq!(deps.lets.len(), 1);
     }
 
     #[test]

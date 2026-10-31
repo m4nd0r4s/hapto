@@ -12,8 +12,9 @@ use std::collections::HashMap;
 
 use crate::ast::{Comprehension, Expr, ExprKind, Ident};
 use crate::check::{check, is_reserved, Checked, Named, Resolution, Scope};
+use crate::deps::{walk, Deps};
 use crate::error::{codes, Error};
-use crate::ir::FnId;
+use crate::ir::{FnId, Node};
 use crate::lexer::{lex, Tok};
 use crate::parser::parse;
 use crate::span::Span;
@@ -37,6 +38,8 @@ pub struct Let {
     pub name: String,
     pub formula: String,
     pub checked: Checked,
+    /// Everything it reads, through other lets and functions too.
+    pub deps: Deps,
 }
 
 /// A user function as declared.
@@ -407,6 +410,9 @@ impl Module {
             let result = check(&plain.body, &mut module, &[], None);
             match result {
                 Ok(checked) => {
+                    // Lets are compiled in dependency order, so every let this
+                    // one reads already knows its own dependencies.
+                    let deps = module.deps(&checked.node);
                     module
                         .let_index
                         .insert(plain.name.clone(), module.lets.len());
@@ -414,6 +420,7 @@ impl Module {
                         name: plain.name.clone(),
                         formula: plain.formula.clone(),
                         checked,
+                        deps,
                     });
                 }
                 Err(e) => errors.push(e.in_formula(&plain.formula).at_path(let_path(&plain.key))),
@@ -462,6 +469,43 @@ impl Module {
             }
         }
         errors
+    }
+
+    /// What `node` reads, transitively through lets and user functions.
+    pub fn deps(&self, node: &Node) -> Deps {
+        let mut deps = Deps::default();
+        let mut calls = Vec::new();
+        walk(node, &mut |n| match n {
+            Node::Value(i) => {
+                deps.values.insert(*i);
+            }
+            Node::Compute(i) => {
+                deps.compute.insert(*i);
+            }
+            Node::Let(i) => {
+                deps.lets.insert(*i);
+            }
+            Node::CallUser(f, _) | Node::BuiltinWithFn(_, f, _) => calls.push(*f),
+            _ => {}
+        });
+        for i in deps.lets.clone() {
+            if let Some(l) = self.lets.get(i) {
+                deps.extend(&l.deps);
+            }
+        }
+        // Functions never recurse (E305), so this descent ends.
+        for f in calls {
+            let inner = self.deps(&self.instances[f].checked.node);
+            deps.extend(&inner);
+        }
+        deps
+    }
+
+    /// The lets a change to these values or compute nodes reaches.
+    pub fn lets_touched_by(&self, values: &[usize], compute: &[usize]) -> Vec<usize> {
+        (0..self.lets.len())
+            .filter(|&i| self.lets[i].deps.touched_by(values, compute))
+            .collect()
     }
 
     pub fn values(&self) -> &[(String, Type)] {
