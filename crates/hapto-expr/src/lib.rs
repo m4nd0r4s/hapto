@@ -10,7 +10,14 @@
 //! Appendix B. It has no kinemo dependency: hapto-core turns evaluated values
 //! into a scene, this crate only says what they are.
 
+// An `Error` carries a message, a hint, options and a span, which makes it
+// large next to an `Ok`. Errors happen when a document is loaded, never per
+// frame, so the size costs nothing that matters; boxing would only make every
+// field one dereference further from the code that builds and tests it.
+#![allow(clippy::result_large_err)]
+
 pub mod error;
+pub mod lexer;
 pub mod span;
 
 pub use error::{Code, Error, Severity};

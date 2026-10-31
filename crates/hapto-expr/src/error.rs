@@ -117,3 +117,43 @@ impl fmt::Display for Error {
         write!(f, "{}: {}", self.code, self.message)
     }
 }
+
+/// Every code the formula language and the figure format can report.
+///
+/// The catalogue is SPEC-2.0 §18.3. A code never changes meaning once
+/// released; a new mistake gets a new code.
+pub mod codes {
+    use super::Code;
+
+    // E1xx — formula syntax
+    pub const E101: Code = Code("E101"); // unexpected token
+    pub const E102: Code = Code("E102"); // `^` used for power
+    pub const E103: Code = Code("E103"); // implicit multiplication
+    pub const E104: Code = Code("E104"); // unclosed bracket or quote
+    pub const E105: Code = Code("E105"); // chained comparison
+    pub const E106: Code = Code("E106"); // non-ASCII operator
+    pub const E107: Code = Code("E107"); // interpolation inside TeX
+
+    // E2xx — types
+    pub const E201: Code = Code("E201"); // type mismatch
+    pub const E202: Code = Code("E202"); // unknown function
+    pub const E203: Code = Code("E203"); // wrong argument count
+    pub const E204: Code = Code("E204"); // operator not defined for these types
+    pub const E205: Code = Code("E205"); // `if` branches differ
+    pub const E206: Code = Code("E206"); // condition not bool
+    pub const E207: Code = Code("E207"); // no such field
+
+    // E3xx — names and scope
+    pub const E301: Code = Code("E301"); // unknown name
+    pub const E302: Code = Code("E302"); // reserved word used as a name
+    pub const E303: Code = Code("E303"); // illegal shadowing
+    pub const E304: Code = Code("E304"); // cycle in lets
+    pub const E305: Code = Code("E305"); // recursion
+    pub const E306: Code = Code("E306"); // duplicate name
+
+    // E6xx — evaluation
+    pub const E604: Code = Code("E604"); // evaluation over budget
+
+    // Warnings
+    pub const W101: Code = Code("W101"); // float equality
+}
