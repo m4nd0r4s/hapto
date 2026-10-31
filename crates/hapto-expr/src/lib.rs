@@ -17,12 +17,20 @@
 #![allow(clippy::result_large_err)]
 
 pub mod ast;
+pub mod builtins;
+pub mod check;
 pub mod error;
+pub mod ir;
 pub mod lexer;
 pub mod parser;
 pub mod span;
+mod suggest;
+pub mod types;
+pub mod value;
 
 pub use ast::Expr;
 pub use error::{Code, Error, Severity};
 pub use parser::parse;
 pub use span::Span;
+pub use types::Type;
+pub use value::Value;
