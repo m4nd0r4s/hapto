@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/hapto-expr", "crates/hapto-core", "crates/hapto-web"]
+members = [
+    "crates/hapto-expr",
+    "crates/hapto-core",
+    "crates/hapto-cli",
+    "crates/hapto-web",
+]
 resolver = "2"
 
 [workspace.package]

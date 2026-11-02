@@ -1,0 +1,20 @@
+[package]
+name = "hapto-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The hapto command: render, check, explain, bake a figure."
+
+[[bin]]
+name = "hapto"
+path = "src/main.rs"
+
+[dependencies]
+# The command line typesets TeX natively, so it can bake (SPEC-2.0 §10.4).
+hapto-core = { workspace = true, features = ["typeset"] }
+hapto-expr.workspace = true
+kinemo-render.workspace = true
+serde.workspace = true
+serde_json.workspace = true

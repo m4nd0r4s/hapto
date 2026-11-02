@@ -397,6 +397,20 @@ pub fn rasterise(scene: &Scene, canvas: Canvas, transparent: bool) -> Image {
     rasterize(&list, true)
 }
 
+/// The same drawing as SVG, at the canvas's device pixels.
+pub fn svg(scene: &Scene, canvas: Canvas) -> String {
+    let (width, height) = canvas.pixels();
+    let index = Arc::new(TimelineIndex::new(scene));
+    let evaluator = Evaluator::with_index(scene, index);
+    let list = display_list_with(
+        &Layout::new(&evaluator),
+        0.0,
+        FrameSize { width, height },
+        false,
+    );
+    kinemo_render::display_list_to_svg(&list)
+}
+
 /// Pixels differing from `bg` by more than 8 levels in any channel, as a
 /// fraction of the image: the ink every figure must have (§21.1).
 pub fn ink(image: &Image, bg: [f64; 4]) -> f64 {

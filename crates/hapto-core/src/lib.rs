@@ -12,6 +12,7 @@
 // per frame, so the size costs nothing that matters.
 #![allow(clippy::result_large_err)]
 
+pub mod check;
 pub mod codes;
 pub mod document;
 pub mod geom;

@@ -533,6 +533,62 @@ fn walk_slot(s: &Slot, f: &mut dyn FnMut(&Compiled)) {
 }
 
 impl Program {
+    /// Every compiled formula outside the lets: marks (children included),
+    /// axis ranges and readouts, for `hapto explain`.
+    pub fn formulas(&self) -> Vec<&Compiled> {
+        let mut out: Vec<&Compiled> = Vec::new();
+        for (x, y) in &self.axes {
+            out.extend(x.range.iter().chain(y.range.iter()));
+        }
+        // Walk with indices into owned data, then borrow back: the walker
+        // takes a callback, and the borrows outlive it.
+        fn collect<'a>(m: &'a CompiledMark, out: &mut Vec<&'a Compiled>) {
+            fn slot<'a>(s: &'a Slot, out: &mut Vec<&'a Compiled>) {
+                match s {
+                    Slot::Formula(c) => out.push(c),
+                    Slot::Map(e) => e.iter().for_each(|(_, v)| slot(v, out)),
+                    Slot::List(i) => i.iter().for_each(|v| slot(v, out)),
+                    Slot::Marks(ms) => ms.iter().for_each(|m| collect(m, out)),
+                    _ => {}
+                }
+            }
+            slot(&m.main, out);
+            m.options.iter().for_each(|(_, o)| slot(o, out));
+            out.extend(m.when.iter());
+            out.extend(m.repeat.iter().map(|(_, c)| c));
+            out.extend(m.drag.iter().map(|(_, c)| c));
+            let st = &m.style;
+            for c in [
+                &st.stroke,
+                &st.width,
+                &st.fill,
+                &st.fill_opacity,
+                &st.opacity,
+                &st.halo,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                out.push(c);
+            }
+            for (_, pieces) in &m.texts {
+                for p in pieces {
+                    if let TextPiece::Expr(c, _) = p {
+                        out.push(c);
+                    }
+                }
+            }
+        }
+        for m in &self.marks {
+            collect(m, &mut out);
+        }
+        for r in &self.readouts {
+            out.push(&r.value);
+            out.extend(r.compare.iter());
+        }
+        out
+    }
+
     /// Compile a document; on failure, every error with its path.
     pub fn new(doc: Document) -> Result<Program, Vec<Error>> {
         let state = State::new(&doc.values);

@@ -848,6 +848,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hapto-cli"
+version = "0.1.0"
+dependencies = [
+ "hapto-core",
+ "hapto-expr",
+ "kinemo-render",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "hapto-core"
 version = "0.1.0"
 dependencies = [
