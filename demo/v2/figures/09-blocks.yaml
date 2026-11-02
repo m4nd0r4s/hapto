@@ -1,0 +1,37 @@
+hapto: 2
+id: blocks
+title: "Caixas, retângulos e grupos"
+alt: "Um diagrama de blocos com ganho K = {K:.2f} e um corpo rodado de {to_deg(a):.0f} graus."
+size: { aspect: 16/9 }
+values:
+  - { name: K, type: number, range: [0.2, 3], default: 1.2, label: "ganho $K$" }
+let:
+  a: "(K - 0.2) / 2.8 * pi"
+  y: "K / (1 + K)"
+view:
+  x: { range: [0, 16] }
+  y: { range: [0, 9] }
+  axes: none
+marks:
+  - { box: "[2, 6.8]", text: "r(t)" }
+  - { box: "[6, 6.8]", w: 2.6, h: 1.4, text: "$K$ = {K:.2f}", style: { fill: "mix(palette('bg'), palette('hot'), K / 6)" } }
+  - { box: "[10.5, 6.8]", text: "planta  $\\frac{1}{s+1}$" }
+  - { box: "[14.4, 6.8]", text: "y = {y:.2f}" }
+  - { arrow: "[[2.9, 6.8], [4.7, 6.8]]" }
+  - { arrow: "[[7.3, 6.8], [8.9, 6.8]]" }
+  - { arrow: "[[12.1, 6.8], [13.5, 6.8]]" }
+  - { polyline: "[[13, 6.8], [13, 4.9], [6, 4.9]]", style: { stroke: muted, dash: dashed } }
+  - { arrow: "[[6, 4.9], [6, 6.05]]", style: { stroke: muted } }
+  - { rect: { from: "[1, 0.8]", to: "[1 + 6*y, 2]" }, radius: 6, style: { fill: positive, fill_opacity: 0.4, stroke: positive } }
+  - { rect: { from: "[1, 0.8]", to: "[7, 2]" }, radius: 6, style: { stroke: muted } }
+  - { text: "saída / referência = {y:.0%}", at: "[1, 2.3]", anchor: bottom-left, size: 13 }
+  - group:
+      - { rect: "[-1.2, -0.6]", w: 2.4, h: 1.2, radius: 4, style: { fill: cool, fill_opacity: 0.25, stroke: cool } }
+      - { arrow: "[[0, 0], [1.9, 0]]", style: { stroke: hot, width: 3 } }
+      - { point: "[1.2, 0.6]", r: 5, label: "canto" }
+    translate: "[11.5, 2.2]"
+    rotate: a
+  - { text: "grupo rodado {to_deg(a):.0f}°", at: "[11.5, 0.2]", anchor: bottom, size: 12 }
+readouts:
+  - { id: gain, label: "$K$", value: "K", format: ".2f" }
+  - { id: out, label: "$y$", value: "y", format: ".3f" }

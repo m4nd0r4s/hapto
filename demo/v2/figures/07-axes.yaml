@@ -1,0 +1,22 @@
+hapto: 2
+id: axes
+title: "Vistas e eixos"
+alt: "Quatro vistas, uma por estilo de eixos, com zoom {z:.1f}."
+size: { aspect: 16/10 }
+values:
+  - { name: z, type: number, range: [1, 4], default: 1.5, label: "zoom" }
+layout: { columns: 2, rows: 2, gap: 18 }
+views:
+  - { id: a, area: [0, 0], title: "cross", axes: cross, x: { range: ["-3/z", "3/z"] }, y: { range: [-1.5, 1.5] } }
+  - { id: b, area: [1, 0], title: "box + grid", axes: box, grid: major, x: { range: [0, "10/z"] }, y: { range: [0, 100] } }
+  - { id: c, area: [0, 1], title: "left-bottom", axes: left-bottom, x: { range: [-1, 1] }, y: { range: [-0.2, 1.2] }, aspect: equal }
+  - { id: d, area: [1, 1], title: "x (reta real)", axes: x, x: { range: ["-5*z", "5*z"] }, y: { range: [-1, 1] } }
+marks:
+  - { view: a, function: "tanh(3*x)", var: x }
+  - { view: a, function: "1/x", var: x, style: { stroke: hot } }
+  - { view: b, function: "x**2", var: x }
+  - { view: b, point: "[k, k**2]", r: 3, repeat: { k: "range(0, 11)" } }
+  - { view: c, function: "sqrt(1 - x**2)", var: x, style: { stroke: cool } }
+  - { view: c, circle: "[0, 0.5]", r: "0.5/z", style: { stroke: accent } }
+  - { view: d, point: "[q, 0]", r: 5, shape: diamond, repeat: { q: "[-3, -1.5, 0, pi, 2*e]" }, style: { fill: positive } }
+  - { view: d, segment: "[[-z, 0], [z, 0]]", arrows: both, style: { stroke: hot, width: heavy } }

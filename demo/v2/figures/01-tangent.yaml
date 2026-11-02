@@ -1,0 +1,28 @@
+hapto: 2
+id: tangent
+title: "A inclinação num ponto"
+alt: "A cúbica f, com um ponto em x = {x:.2f} e a sua tangente, de inclinação {derivative(f, x):.2f}."
+values:
+  - { name: x, type: number, range: [-2.2, 2.2], default: 1, label: "$x$" }
+let:
+  "f(t)": "t**3/3 - t"
+  slope: "derivative(f, x)"
+view:
+  x: { range: [-2.6, 2.6] }
+  y: { range: [-2.2, 2.2] }
+  grid: major
+marks:
+  - { function: "f(x)", var: x }
+  - { math: "f(x) = \\frac{x^3}{3} - x", at: "[1.6, -1.75]" }
+  - { tangent: x, of: f, style: { stroke: hot, width: line } }
+  - { drop: "[x, f(x)]", to: both }
+  - { point: "[x, f(x)]", r: 6, label: "inclinação {slope:+.2f}" }
+  - point: "[r, 0]"
+    shape: ring
+    r: 5
+    style: { stroke: cool }
+    repeat: { r: "roots(f, -3, 3)" }
+  - { text: "f'(x) = x² − 1 = {x**2 - 1:.3f}", at: "[-2.5, 2.1]", anchor: top-left, background: box }
+readouts:
+  - { id: slope, label: "inclinação", value: "slope", format: "+.3f" }
+  - { id: kind, label: "a curva está", value: "if slope > 0.01 then 'a subir' else if slope < -0.01 then 'a descer' else 'parada'" }

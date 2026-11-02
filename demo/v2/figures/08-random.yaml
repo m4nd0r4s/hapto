@@ -1,0 +1,28 @@
+hapto: 2
+id: random
+title: "Amostras de uma normal"
+alt: "Uma amostra de {count(xs)} valores com σ = {sigma:.2f}."
+values:
+  - { name: sigma, type: number, range: [0.3, 2], default: 1, label: "$\\sigma$" }
+let:
+  xs: "samples_normal(0, sigma, 300, 7)"
+  H: "histogram(xs, -5, 5, 25)"
+  w: "10 / 25"
+  idx: "range(0, 25)"
+view:
+  x: { range: [-5, 5] }
+  y: { range: [0, "0.6/sigma"] }
+  axes: left-bottom
+marks:
+  - polygon: "[[H.edges[i], 0], [H.edges[i], H.density[i]], [H.edges[i] + w, H.density[i]], [H.edges[i] + w, 0]]"
+    repeat: { i: "idx" }
+    style: { fill: c1, fill_opacity: 0.45, stroke: bg, width: 1 }
+  - { function: "normal_pdf(x, 0, sigma)", var: x, style: { stroke: hot, width: heavy }, label: "$\\mathcal{N}(0, \\sigma^2)$" }
+  - point: "[v, -0.0]"
+    r: 2
+    style: { fill: muted }
+    repeat: { v: "xs" }
+  - text: "média = {mean(xs):+.3f}"
+    at: "[4.9, 0.58/sigma]"
+    anchor: top-right
+    background: box

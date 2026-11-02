@@ -1,0 +1,32 @@
+hapto: 2
+id: riemann
+title: "Somas de Riemann"
+alt: "Retângulos sob uma curva; com n = {n} a soma é {riemann:.4f} e o integral é {exact:.4f}."
+values:
+  - { name: n, type: number, range: [1, 40], default: 6, step: integer, label: "$n$" }
+let:
+  "f(t)": "1 + sin(t) + t/4"
+  a: 0
+  b: 6
+  dx: "(b - a) / n"
+  xs: "[a + i*dx for i in range(0, n)]"
+  riemann: "sum(f(x0 + dx/2) * dx for x0 in xs)"
+  exact: "integral(f, a, b)"
+view:
+  x: { range: [-0.5, 6.5] }
+  y: { range: [-0.5, 3.5] }
+  axes: left-bottom
+marks:
+  - polygon: "[[x0, 0], [x0, f(x0 + dx/2)], [x0 + dx, f(x0 + dx/2)], [x0 + dx, 0]]"
+    repeat: { x0: "xs" }
+    style:
+      fill: "colour_scale('sequential', x0, a, b)"
+      fill_opacity: 0.55
+      stroke: bg
+      width: 1
+  - { function: "f(x)", var: x, domain: [a, b], style: { width: heavy } }
+  - { vline: a, style: { dash: dashed, stroke: muted } }
+  - { vline: b, style: { dash: dashed, stroke: muted } }
+  - { math: "\\int_a^b f(x)\\,dx \\approx \\sum_{i=0}^{n-1} f(x_i + \\tfrac{\\Delta x}{2})\\,\\Delta x", at: "[3, 2.9]", anchor: top }
+readouts:
+  - { id: sum, label: "soma do ponto médio", value: "riemann", format: ".5f", compare: "exact", place: inside }

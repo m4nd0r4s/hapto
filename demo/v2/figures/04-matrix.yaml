@@ -1,0 +1,34 @@
+hapto: 2
+id: matrix
+title: "Uma matriz a atuar no plano"
+alt: "A matriz roda de {to_deg(a):.0f} graus e estica x por {s:.2f}; o determinante é {det(M):.2f}."
+values:
+  - { name: a, type: number, range: [0, 2.5], default: 0.6, label: "rotação" }
+let:
+  s: "1 + 0.5*sin(2*a)"
+  M: "mat([cos(a), -sin(a)], [sin(a), cos(a)]) * mat([s, 0], [0, 1])"
+  e1: "M * [1, 0]"
+  e2: "M * [0, 1]"
+  square: "[[0, 0], e1, e1 + e2, e2]"
+view:
+  x: { range: [-2.4, 2.4] }
+  y: { range: [-2.4, 2.4] }
+  aspect: equal
+  grid: major
+marks:
+  - { polygon: "[[0, 0], [1, 0], [1, 1], [0, 1]]", style: { fill: faint, fill_opacity: 0.6, stroke: muted, dash: dashed } }
+  - { polygon: "square", style: { fill: "with_alpha(palette('accent'), 0.22)", stroke: accent, width: line } }
+  - { vector: "e1", style: { stroke: hot }, label: "$M e_1$" }
+  - { vector: "e2", style: { stroke: cool }, label: "$M e_2$" }
+  - point: "rotate([1.6, 0], k*pi/6)"
+    r: 3
+    shape: cross
+    style: { stroke: muted }
+    repeat: { k: "range(0, 12)" }
+  - polyline: "[M * polar(1, th) for th in linspace(0, tau, 97)]"
+    style: { stroke: positive, width: line }
+  - { ellipse: "[0, 0]", rx: 2.1, ry: 0.5, tilt: a, style: { stroke: muted, dash: dotted } }
+  - text: "det M = {det(M):.3f}   tr M = {trace(M):.3f}"
+    at: "[-2.3, -2.3]"
+    anchor: bottom-left
+    background: box

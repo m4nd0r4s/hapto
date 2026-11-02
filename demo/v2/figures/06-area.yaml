@@ -1,0 +1,31 @@
+hapto: 2
+id: signed_area
+title: "Área com sinal entre duas curvas"
+alt: "A área com sinal entre f e g, de 0 a b = {b:.2f}, vale {integral(h, 0, b):.3f}."
+values:
+  - { name: b, type: number, range: [0.5, 9], default: 6, label: "$b$" }
+let:
+  "f(t)": "sin(t) + 0.3*t"
+  "g(t)": "0.25*t + 0.2"
+  "h(t)": "f(t) - g(t)"
+  cuts: "roots(h, 0, b)"
+view:
+  x: { range: [-0.5, 9.5] }
+  y: { range: [-1.5, 4.5] }
+  axes: left-bottom
+marks:
+  - area: { between: ["f(x)", "g(x)"], var: x, from: 0, to: b }
+    signed: true
+  - { function: "f(x)", var: x, label: "$f$" }
+  - { function: "g(x)", var: x, label: "$g$" }
+  - { secant: "[0, b]", of: f, style: { stroke: muted, dash: dashed } }
+  - { vline: b, style: { stroke: fg, dash: dotted } }
+  - { ray: "[[0, -1], [1, -0.6]]", style: { stroke: muted, dash: dotted } }
+  - point: "[c, f(c)]"
+    r: 4
+    shape: ring
+    repeat: { c: "cuts" }
+  - text: "∫₀ᵇ (f − g) dx = {integral(h, 0, b):+.3f}   ({count(cuts)} cruzamentos)"
+    at: "[9.4, 4.4]"
+    anchor: top-right
+    background: box

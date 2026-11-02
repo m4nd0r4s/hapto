@@ -1,0 +1,35 @@
+hapto: 2
+id: unit_circle
+title: "Do círculo à onda"
+alt: "O ângulo θ = {t:.2f} no círculo unitário e o seno correspondente."
+size: { aspect: 2.4 }
+values:
+  - { name: t, type: number, range: [0, 6.283], default: 1, label: "$\\theta$" }
+let:
+  p: "polar(1, t)"
+layout: { columns: 2, widths: [1, 2], gap: 24 }
+views:
+  - id: circle
+    area: [0, 0]
+    aspect: equal
+    x: { range: [-1.3, 1.3] }
+    y: { range: [-1.3, 1.3] }
+    axes: cross
+  - id: wave
+    area: [1, 0]
+    x: { range: [0, 6.6], label: "$\\theta$" }
+    y: { range: [-1.3, 1.3] }
+    axes: cross
+marks:
+  - { view: circle, circle: "[0, 0]", r: 1, style: { stroke: muted, width: line } }
+  - { view: circle, sector: "[0, 0]", r: 1, from: 0, to: t, style: { fill: accent, fill_opacity: 0.12 } }
+  - { view: circle, angle: "[0, 0]", from: "[1, 0]", to: p, r: 26, label: "θ" }
+  - { view: circle, segment: "[[0, 0], p]", style: { stroke: fg } }
+  - { view: circle, segment: "[[p.x, 0], p]", style: { stroke: hot, width: heavy } }
+  - { view: circle, segment: "[[0, 0], [p.x, 0]]", style: { stroke: cool, width: heavy } }
+  - { view: circle, point: p, r: 6 }
+  - { view: wave, function: "sin(x)", var: x, domain: [0, tau], style: { stroke: hot } }
+  - { view: wave, function: "cos(x)", var: x, domain: [0, tau], style: { stroke: cool, dash: dashed } }
+  - { view: wave, vline: t, style: { stroke: muted, dash: dotted } }
+  - { view: wave, point: "[t, sin(t)]", r: 6, label: "sin θ = {sin(t):.3f}", style: { fill: hot } }
+  - { view: wave, point: "[t, cos(t)]", r: 5, shape: diamond, label: "cos θ = {cos(t):.3f}", style: { fill: cool } }

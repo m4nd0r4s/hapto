@@ -32,3 +32,7 @@ typeset = ["kinemo-math/typeset"]
 [[example]]
 name = "m0_rebuild"
 required-features = ["typeset"]
+
+[[example]]
+name = "gallery"
+required-features = ["typeset"]
