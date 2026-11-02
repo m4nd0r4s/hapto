@@ -5,7 +5,7 @@ use hapto_expr::{Error, Value};
 use kinemo_render::raster::Image;
 
 use crate::layout::{draw_axes, frames, Frame};
-use crate::program::{Compiled, CompiledMark, Program};
+use crate::program::{Compiled, CompiledMark, Program, Slot};
 use crate::scene::{rasterise, Builder, Canvas};
 use crate::state::{Admitted, Input};
 use crate::theme::Theme;
@@ -127,6 +127,7 @@ impl Figure {
                 z as f64,
                 &[],
                 &mut drawn,
+                &marks::IDENTITY,
             )?;
         }
         self.warnings.clear();
@@ -210,6 +211,7 @@ fn draw(
     z: f64,
     outer: &[Value],
     drawn: &mut usize,
+    transform: &marks::Affine,
 ) -> Result<(), Error> {
     let repeated = !m.repeat.is_empty();
     for (idx, bound) in instances(ev, m, outer, drawn)?.into_iter().enumerate() {
@@ -217,6 +219,18 @@ fn draw(
             if eval(ev, w, &bound)?.bool() != Some(true) {
                 continue;
             }
+        }
+        if let Slot::Marks(children) = &m.main {
+            // A group: its transform, then its children inside it; they
+            // inherit its view and its `when` (§8.14).
+            let own = group_transform(ev, m, &bound)?;
+            let inner = marks::compose(transform, &own);
+            let z = m.source.common.z.unwrap_or(z);
+            for (i, child) in children.iter().enumerate() {
+                let z = z + (i as f64 + 1.0) * 1e-3;
+                draw(b, ev, child, target, theme, z, &bound, drawn, &inner)?;
+            }
+            continue;
         }
         let index = repeated.then_some(idx);
         let paint = style::resolve(
@@ -239,10 +253,44 @@ fn draw(
             bound: &bound,
             paint,
             anchor: None,
+            transform: *transform,
         };
         marks::draw(&mut ctx)?;
     }
     Ok(())
+}
+
+/// A group's `translate`, `rotate`, `scale` and `origin`, at this instance.
+fn group_transform(
+    ev: &mut Evaluation,
+    m: &CompiledMark,
+    bound: &[Value],
+) -> Result<marks::Affine, Error> {
+    let mut get = |key: &str| -> Result<Option<Value>, Error> {
+        match m.option(key).and_then(Slot::formula) {
+            Some(c) => Ok(Some(eval(ev, c, bound)?)),
+            None => Ok(None),
+        }
+    };
+    let finite = |v: [f64; 2]| v[0].is_finite() && v[1].is_finite();
+    let translate = get("translate")?
+        .and_then(|v| v.vec())
+        .filter(|v| finite(*v))
+        .unwrap_or([0.0, 0.0]);
+    let rotate = get("rotate")?
+        .map(|v| v.num())
+        .filter(|v| v.is_finite())
+        .unwrap_or(0.0);
+    let scale = match get("scale")? {
+        Some(Value::Num(k)) if k.is_finite() => [k, k],
+        Some(Value::Vec(v)) if finite(v) => v,
+        _ => [1.0, 1.0],
+    };
+    let origin = get("origin")?
+        .and_then(|v| v.vec())
+        .filter(|v| finite(*v))
+        .unwrap_or([0.0, 0.0]);
+    Ok(marks::group_transform(translate, rotate, scale, origin))
 }
 
 #[cfg(test)]
@@ -361,5 +409,51 @@ marks:
             faded > solid,
             "the unfocused mark fades toward the background"
         );
+    }
+
+    fn scene_of(marks: &str) -> kinemo_ir::Scene {
+        let doc = format!("hapto: 2\nalt: a\nvalues: [ {{ name: t, type: number, range: [0, 7], default: 1.5708 }} ]\nview: {{ x: {{ range: [-4, 4] }}, y: {{ range: [-4, 4] }}, aspect: equal, axes: none }}\nmarks:\n{marks}");
+        let mut f = Figure::from_text(&doc).unwrap_or_else(|e| panic!("{e:?}"));
+        f.scene(Canvas::new(400.0, 400.0, 1.0), &Theme::light())
+            .unwrap()
+    }
+
+    fn first(s: &kinemo_ir::Scene, kind: &str, prop: &str) -> kinemo_ir::Value {
+        let o = s.objects.iter().find(|o| o.kind == kind).unwrap();
+        s.signals[o.props[prop] as usize].initial.clone()
+    }
+
+    /// §8.14: transforms move positions; widths in px are not scaled.
+    #[test]
+    fn a_rotated_scaled_group_keeps_its_widths() {
+        let plain = scene_of("  - { segment: '[[0, 0], [1, 0]]', style: { width: 2 } }");
+        let grouped = scene_of("  - group:\n      - { segment: '[[0, 0], [1, 0]]', style: { width: 2 } }\n    rotate: t\n    scale: 3\n    translate: '[1, 1]'");
+        assert_eq!(
+            first(&plain, "polyline", "stroke_width"),
+            first(&grouped, "polyline", "stroke_width")
+        );
+        // [0, 0]–[1, 0] scaled by 3, turned a quarter, moved by [1, 1].
+        let moved = scene_of("  - { segment: '[[1, 1], [1, 4]]', style: { width: 2 } }");
+        let (kinemo_ir::Value::List(a), kinemo_ir::Value::List(b)) = (
+            first(&grouped, "polyline", "points"),
+            first(&moved, "polyline", "points"),
+        ) else {
+            panic!("no points")
+        };
+        for (p, q) in a.iter().zip(&b) {
+            let (kinemo_ir::Value::Vec2(p), kinemo_ir::Value::Vec2(q)) = (p, q) else {
+                panic!("not points")
+            };
+            assert!(
+                (p[0] - q[0]).abs() < 1e-3 && (p[1] - q[1]).abs() < 1e-3,
+                "{p:?} {q:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_group_inherits_when() {
+        let s = scene_of("  - group:\n      - { point: '[0, 0]' }\n    when: 't > 5'");
+        assert!(s.objects.is_empty());
     }
 }

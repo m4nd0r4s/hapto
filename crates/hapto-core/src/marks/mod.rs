@@ -3,6 +3,7 @@
 mod curves;
 mod function;
 mod lines;
+mod shapes;
 pub mod text;
 
 use hapto_expr::eval::Evaluation;
@@ -28,6 +29,54 @@ pub struct Ctx<'a, 'e> {
     /// Where the label attaches, when drawing the mark found it (a function's
     /// last visible point); otherwise each kind's own rule (§10.3).
     pub anchor: Option<[f64; 2]>,
+    /// The groups around this mark, as one affine map of data coordinates
+    /// applied before the view's mapping (§8.14).
+    pub transform: Affine,
+}
+
+/// `[a, b, c, d, e, f]`: `(x, y) -> (a·x + b·y + e, c·x + d·y + f)`.
+pub type Affine = [f64; 6];
+
+pub const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+pub fn apply(t: &Affine, p: [f64; 2]) -> [f64; 2] {
+    [
+        t[0] * p[0] + t[1] * p[1] + t[4],
+        t[2] * p[0] + t[3] * p[1] + t[5],
+    ]
+}
+
+/// `outer ∘ inner`: apply `inner` first.
+pub fn compose(outer: &Affine, inner: &Affine) -> Affine {
+    let [a, b, c, d, e, f] = *outer;
+    let [p, q, r, s, t, u] = *inner;
+    [
+        a * p + b * r,
+        a * q + b * s,
+        c * p + d * r,
+        c * q + d * s,
+        a * t + b * u + e,
+        c * t + d * u + f,
+    ]
+}
+
+/// A group's transform: about `origin`, scale, then rotate, then translate.
+pub fn group_transform(
+    translate: [f64; 2],
+    rotate: f64,
+    scale: [f64; 2],
+    origin: [f64; 2],
+) -> Affine {
+    let (s, c) = rotate.sin_cos();
+    let (a, b, cc, d) = (c * scale[0], -s * scale[1], s * scale[0], c * scale[1]);
+    [
+        a,
+        b,
+        cc,
+        d,
+        origin[0] + translate[0] - a * origin[0] - b * origin[1],
+        origin[1] + translate[1] - cc * origin[0] - d * origin[1],
+    ]
 }
 
 impl Ctx<'_, '_> {
@@ -85,7 +134,7 @@ impl Ctx<'_, '_> {
     }
 
     pub fn css(&self, p: [f64; 2]) -> [f64; 2] {
-        self.map.to_css(p)
+        self.map.to_css(apply(&self.transform, p))
     }
 
     /// Stroke a CSS-pixel polyline, clipped to the plot when asked.
@@ -178,6 +227,9 @@ fn draw_mark(ctx: &mut Ctx) -> Result<(), Error> {
     }
     if curves::draws(ctx.m.source.kind) {
         return curves::draw(ctx);
+    }
+    if shapes::draws(ctx.m.source.kind) {
+        return shapes::draw(ctx);
     }
     let name = ctx.m.source.kind;
     let lands = kind(name)

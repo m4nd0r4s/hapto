@@ -716,6 +716,19 @@ fn read_mark(r: &mut Reader, at: At) -> Option<Mark> {
         .filter(|k| kind(k).is_some())
         .map(String::as_str)
         .collect();
+    // A kind's option may share a name with another kind (`box` has `text`):
+    // the kind is the one whose options cover every other kind key (§8.1).
+    let owners: Vec<&str> = kinds
+        .iter()
+        .copied()
+        .filter(|k| {
+            let spec = kind(k).expect("filtered to kinds");
+            kinds
+                .iter()
+                .all(|o| o == k || spec.options.iter().any(|(name, _)| name == o))
+        })
+        .collect();
+    let kinds = if owners.len() == 1 { owners } else { kinds };
     let spec = match kinds.as_slice() {
         [one] => kind(one)?,
         [] => {
