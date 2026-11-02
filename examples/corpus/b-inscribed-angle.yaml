@@ -1,0 +1,35 @@
+# Part B (SPEC-2.0 §22.2): the inscribed angle is half the central angle,
+# wherever the point is on the far arc.
+hapto: 2
+id: inscribed_angle
+title: "Half the central angle, wherever P is"
+alt: "The central angle AOB is {to_deg(central):.1f}°; the inscribed angle APB is {to_deg(inscribed):.1f}°, half of it."
+values:
+  - { name: s, type: number, range: [1.75, 5.35], default: 3.4, label: "where $P$ is" }
+  - { name: t, type: number, range: [0.4, 2.6], default: 1.6, label: "arc $AB$" }
+let:
+  A: "polar(1, -t / 2)"
+  B: "polar(1, t / 2)"
+  P: "polar(1, s)"
+  central: "abs(angle_between(A, B))"
+  inscribed: "abs(angle_between(A - P, B - P))"
+view:
+  x: { range: [-1.35, 1.35] }
+  y: { range: [-1.35, 1.35] }
+  aspect: equal
+  axes: none
+marks:
+  - { circle: "[0, 0]", r: 1, style: { stroke: muted, width: 1.5 } }
+  - { sector: "[0, 0]", r: 1, from: "-t / 2", to: "t / 2", style: { fill: cool, fill_opacity: 0.08 } }
+  - { polyline: "[A, [0, 0], B]", style: { stroke: cool, width: 2 } }
+  - { polyline: "[A, P, B]", style: { stroke: hot, width: 2 } }
+  - { angle: "[0, 0]", from: "A", to: "B", r: 30, style: { stroke: cool }, label: "{to_deg(central):.0f}°" }
+  - { angle: "P", from: "A", to: "B", r: 30, style: { stroke: hot }, label: "{to_deg(inscribed):.0f}°" }
+  - { point: "[0, 0]", r: 4, style: { fill: fg }, label: "$O$" }
+  - { point: "A", r: 5, style: { fill: cool }, label: "$A$" }
+  - { point: "B", r: 5, style: { fill: cool }, label: "$B$" }
+  - { point: "P", r: 7, style: { fill: hot }, label: "$P$", drag: { s: "atan2(pointer.y, pointer.x) + (if pointer.y < 0 then tau else 0)" } }
+readouts:
+  - { id: central, label: "central $\\angle AOB$", value: "to_deg(central)", format: ".1f", unit: "°" }
+  - { id: inscribed, label: "inscribed $\\angle APB$", value: "to_deg(inscribed)", format: ".1f", unit: "°" }
+  - { id: ratio, label: "ratio", value: "inscribed / central", format: ".3f" }

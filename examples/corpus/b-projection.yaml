@@ -1,0 +1,28 @@
+# Part B (SPEC-2.0 §22.2): the residual of a projection is perpendicular.
+hapto: 2
+id: projection
+title: "The residual is perpendicular"
+alt: "b = ({b.x:.1f}, {b.y:.1f}) projected on the line of a: the residual has dot product {dot(r, a):.2f} with a."
+values:
+  - { name: a, type: point, range: [[-4, -3], [4, 3]], default: [3.5, 1.2], label: "$a$" }
+  - { name: b, type: point, range: [[-4, -3], [4, 3]], default: [1.2, 2.6], label: "$b$" }
+let:
+  p: "proj(b, a)"
+  r: "b - p"
+view:
+  x: { range: [-4.2, 4.2] }
+  y: { range: [-3.2, 3.2] }
+  aspect: equal
+  grid: major
+marks:
+  - { line: { through: "[0, 0]", direction: "a" }, style: { stroke: muted, width: 1, dash: [6, 4] } }
+  - { vector: "a", style: { stroke: cool, width: 2.5 }, label: "$a$" }
+  - { vector: "b", style: { stroke: fg, width: 2.5 }, label: "$b$" }
+  - { vector: "p", style: { stroke: accent, width: 3.5 }, label: { text: "$\\mathrm{proj}_a b$", at: mid } }
+  - { segment: "[p, b]", style: { stroke: hot, dash: dashed, width: 2 }, label: { text: "$r$", at: mid } }
+  - { angle: "p", from: "b", to: "p + unit(a)", r: 14, right: always, style: { stroke: hot } }
+  - { point: "a", r: 6, style: { fill: cool }, drag: { a: "pointer" } }
+  - { point: "b", r: 6, style: { fill: fg }, drag: { b: "pointer" } }
+readouts:
+  - { id: residual, label: "$r \\cdot a$", value: "dot(r, a)", format: "+.3f" }
+  - { id: length, label: "$|\\mathrm{proj}_a b|$", value: "norm(p)", format: ".3f" }

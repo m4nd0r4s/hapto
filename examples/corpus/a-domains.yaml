@@ -1,0 +1,44 @@
+# Part A (SPEC-2.0 §22.1), from phx/docs/_archive/handbook/demos.js
+# `demoDomains`: effort times flow is power, in every physical domain. The
+# rectangle's sides are effort and flow; its area is the watt.
+hapto: 2
+id: a_domains
+title: "Effort times flow is power, in every domain"
+alt: "A rectangle {fname} by {ename}: {effort:.3g} {eunit} times {flow:.3g} {funit} is {P:.3g} W."
+values:
+  - name: domain
+    type: choice
+    options: [elec, mech, rot, hyd]
+    labels: { elec: "electrical", mech: "translation", rot: "rotation", hyd: "hydraulic" }
+    default: elec
+  # Kept as fractions of each domain's maximum, so switching domain does
+  # not make the rectangle jump.
+  - { name: c, type: point, range: [[0.06, 0.06], [1, 1]], default: [0.55, 0.62], label: "corner" }
+let:
+  pick: "if domain == 'elec' then 0 else if domain == 'mech' then 1 else if domain == 'rot' then 2 else 3"
+  emax: "[48, 220, 35, 2.4e5][pick]"
+  fmax: "[10, 2.2, 14, 2e-3][pick]"
+  ename: "if pick == 0 then 'voltage' else if pick == 1 then 'force' else if pick == 2 then 'torque' else 'pressure'"
+  fname: "if pick == 0 then 'current' else if pick == 1 then 'velocity' else if pick == 2 then 'angular velocity' else 'flow'"
+  eunit: "if pick == 0 then 'V' else if pick == 1 then 'N' else if pick == 2 then 'N·m' else 'Pa'"
+  funit: "if pick == 0 then 'A' else if pick == 1 then 'm/s' else if pick == 2 then 'rad/s' else 'm³/s'"
+  effort: "c.y * emax"
+  flow: "c.x * fmax"
+  P: "effort * flow"
+view:
+  x: { range: [0, 1.1], label: "flow $f$", ticks: { at: [0, 0.5, 1], labels: ["0", "half", "max"] } }
+  y: { range: [0, 1.1], label: "effort $e$", ticks: { at: [0, 0.5, 1], labels: ["0", "half", "max"] } }
+  axes: left-bottom
+marks:
+  - rect: { from: "[0, 0]", to: "c" }
+    style: { fill: cool, fill_opacity: 0.2, stroke: faint, width: 1 }
+  - { arrow: "[[0, 0], [0, c.y]]", style: { stroke: hot, width: 2.5 } }
+  - { arrow: "[[0, 0], [c.x, 0]]", style: { stroke: cool, width: 2.5 } }
+  - { text: "{ename} e = {effort:.3g} {eunit}", at: "[0, c.y]", anchor: bottom-left, offset: [8, 6], style: { fill: hot } }
+  - { text: "{fname} f = {flow:.3g} {funit}", at: "[c.x, 0]", anchor: left, offset: [8, 12], style: { fill: cool } }
+  - { text: "P = e × f", at: "c / 2", anchor: center, size: 15, weight: bold }
+  - { text: "the area", at: "c / 2", anchor: top, offset: [0, -12], size: 12, style: { fill: muted } }
+  - { point: "c", r: 7, style: { fill: fg }, drag: { c: "pointer" } }
+readouts:
+  - { id: power, label: "$e \\times f$", value: "P", format: ".3g", unit: "W" }
+  - { id: note, label: "", value: "'different units, different names, the same watt'" }

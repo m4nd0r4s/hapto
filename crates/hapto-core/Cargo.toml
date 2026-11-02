@@ -21,6 +21,8 @@ serde_json.workspace = true
 
 [dev-dependencies]
 kinemo-render.workspace = true
+# Reading golden images back (§21.3); already in the tree through kinemo.
+png = "0.18"
 
 [features]
 # Typeset TeX natively with typst: on for the command line and book builds,

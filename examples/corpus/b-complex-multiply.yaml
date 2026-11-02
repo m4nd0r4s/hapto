@@ -1,0 +1,31 @@
+# Part B (SPEC-2.0 §22.2): multiplying complex numbers adds their angles and
+# multiplies their lengths.
+hapto: 2
+id: complex_multiply
+title: "Angles add, lengths multiply"
+alt: "z has angle {to_deg(carg(z)):.0f}° and w {to_deg(carg(w)):.0f}°; their product zw has angle {to_deg(carg(zw)):.0f}° and length {cabs(zw):.2f}."
+values:
+  - { name: z, type: point, range: [[-2, -2], [2, 2]], default: [1.3, 0.5], label: "$z$" }
+  - { name: w, type: point, range: [[-2, -2], [2, 2]], default: [0.6, 1.1], label: "$w$" }
+let:
+  zw: "cmul(z, w)"
+view:
+  x: { range: [-2.6, 2.6], label: "Re" }
+  y: { range: [-2.6, 2.6], label: "Im" }
+  aspect: equal
+  grid: major
+marks:
+  - { circle: "[0, 0]", r: 1, style: { stroke: faint, width: 1, dash: [3, 4] } }
+  - { angle: "[0, 0]", from: "[1, 0]", to: "z", r: 34, style: { stroke: cool } }
+  - { angle: "[0, 0]", from: "[1, 0]", to: "w", r: 46, style: { stroke: positive } }
+  - { angle: "[0, 0]", from: "[1, 0]", to: "zw", r: 58, style: { stroke: hot } }
+  - { vector: "z", style: { stroke: cool, width: 2.5 }, label: "$z$" }
+  - { vector: "w", style: { stroke: positive, width: 2.5 }, label: "$w$" }
+  - { vector: "zw", style: { stroke: hot, width: 3.5 }, label: "$zw$" }
+  - { point: "z", r: 6, style: { fill: cool }, drag: { z: "pointer" } }
+  - { point: "w", r: 6, style: { fill: positive }, drag: { w: "pointer" } }
+readouts:
+  - { id: angles, label: "$\\arg z + \\arg w$", value: "to_deg(wrap(carg(z) + carg(w)))", format: ".1f", unit: "°" }
+  - { id: product_angle, label: "$\\arg zw$", value: "to_deg(carg(zw))", format: ".1f", unit: "°" }
+  - { id: lengths, label: "$|z|\\,|w|$", value: "cabs(z) * cabs(w)", format: ".3f" }
+  - { id: product_length, label: "$|zw|$", value: "cabs(zw)", format: ".3f" }

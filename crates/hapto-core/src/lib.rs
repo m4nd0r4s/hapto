@@ -16,6 +16,7 @@ pub mod check;
 pub mod codes;
 pub mod document;
 pub mod geom;
+pub mod golden;
 pub mod layout;
 pub mod marks;
 pub mod maths;

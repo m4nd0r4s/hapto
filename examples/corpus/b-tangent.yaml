@@ -1,0 +1,25 @@
+# Part B (SPEC-2.0 §22.2), Appendix A.1: the slope is the limit of secants.
+hapto: 2
+id: tangent
+title: "The slope at a point"
+alt: "The curve y = x² − 2x with a point at x = {x:.2f}; its tangent has slope {slope:.2f}."
+values:
+  - { name: x, type: number, range: [-1, 3], default: 2, label: "$x$" }
+  - { name: h, type: number, range: [0.01, 2], default: 1, scale: log, label: "$h$" }
+let:
+  "f(t)": "t**2 - 2*t"
+  slope: "derivative(f, x)"
+  secant_slope: "(f(x + h) - f(x)) / h"
+  flat: "abs(slope) < 0.02"
+view:
+  x: { range: [-1.5, 3.5], label: "$x$" }
+  y: { range: [-1.5, 3.5], label: "$y$" }
+marks:
+  - { function: "f(x)", var: x, legend: "$f(x) = x^2 - 2x$", label: "$f$" }
+  - { secant: "[x, x + h]", of: f, style: { stroke: cool, dash: dashed }, legend: "secant" }
+  - { tangent: "x", of: f, style: { stroke: hot }, legend: "tangent", name: tangent }
+  - { point: "[x + h, f(x + h)]", r: 4, style: { fill: cool }, drag: { h: "pointer.x - x" } }
+  - { point: "[x, f(x)]", drag: { x: "pointer.x" }, label: "$P$" }
+readouts:
+  - { id: slope, label: "tangent slope", value: "slope", format: "+.3f" }
+  - { id: secant, label: "secant slope", value: "secant_slope", format: "+.3f" }

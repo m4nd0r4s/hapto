@@ -25,9 +25,36 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      # TeX typesetting is a feature (typst): test it too.
+      # hapto-cli turns typst on for hapto-core; leaving it out keeps the
+      # build without typst (the browser's) tested too.
+      - run: cargo test --workspace --exclude hapto-cli
+      # TeX typesetting is a feature (typst): test it too. This runs the
+      # acceptance corpus against its goldens (SPEC-2.0 §21.3).
       - run: cargo test -p hapto-core --features typeset
+      - run: cargo test -p hapto-cli
+      - name: every command on the corpus (SPEC-2.0 §17)
+        shell: bash
+        run: |
+          cargo build -q -p hapto-cli
+          hapto=target/debug/hapto
+          mkdir -p target/corpus
+          $hapto check examples/corpus/*.yaml
+          for f in examples/corpus/*.yaml; do
+            n=$(basename "$f" .yaml)
+            $hapto render "$f" -o "target/corpus/$n.png"
+            $hapto render "$f" -o "target/corpus/$n-dark.svg" --theme dark --width 360
+            $hapto explain "$f" > /dev/null
+            $hapto bake "$f" -o "target/corpus/$n.json"
+          done
+          $hapto schema > /dev/null
+          $hapto errors > /dev/null
+      - name: goldens that differ
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs-${{ matrix.os }}
+          path: target/golden-diffs
+          if-no-files-found: ignore
 
   wasm:
     # The formula language must compute the same digits in the browser, so
@@ -41,3 +68,5 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p hapto-expr --target wasm32-unknown-unknown
+      # The page's build: hapto-core without typst (SPEC-2.0 §10.4).
+      - run: cargo check -p hapto-web --target wasm32-unknown-unknown

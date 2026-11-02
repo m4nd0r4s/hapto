@@ -1,0 +1,28 @@
+# Part A (SPEC-2.0 §22.1), from phx/docs/_archive/handbook/demos.js
+# `demoRotation`: J = [[0, 1], [-1, 0]] turns any vector a right angle.
+hapto: 2
+id: a_rotation
+title: "J turns every vector by a right angle"
+size: { aspect: 4/3 }
+alt: "The vector x = ({x.x:.1f}, {x.y:.1f}) and Jx = ({Jx.x:.1f}, {Jx.y:.1f}), at a right angle; their dot product is {dot(x, Jx):.2f}."
+values:
+  - { name: x, type: point, range: [[-6.5, -6.5], [6.5, 6.5]], default: [3, 5], label: "$x$" }
+let:
+  J: "mat([0, 1], [-1, 0])"
+  Jx: "J * x"
+view:
+  x: { range: [-7, 7], label: "$x_1$" }
+  y: { range: [-7, 7], label: "$x_2$" }
+  aspect: equal
+marks:
+  # The circle the tip runs on: both vectors have the same length.
+  - { circle: "[0, 0]", r: "norm(x)", style: { stroke: faint, width: 1, dash: [3, 4] } }
+  - { angle: "[0, 0]", from: "x", to: "Jx", r: 26, right: always, label: "90°", style: { stroke: hot } }
+  - { vector: "x", style: { stroke: cool, width: 3 }, label: "$x$" }
+  - { vector: "Jx", style: { stroke: hot, width: 3 }, label: "$Jx$" }
+  - { point: "[0, 0]", r: 3, style: { fill: fg } }
+  - { point: "x", r: 7, style: { fill: cool }, drag: { x: "pointer" } }
+readouts:
+  - { id: x, label: "$x$", value: "x" }
+  - { id: jx, label: "$Jx$", value: "Jx" }
+  - { id: dot, label: "$x^\\top J x$", value: "dot(x, Jx)", format: ".2f" }
