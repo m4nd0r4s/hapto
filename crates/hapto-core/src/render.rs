@@ -57,6 +57,19 @@ impl Figure {
         Ok(rasterise(&scene, canvas, false))
     }
 
+    /// Every readout at the current state, as the page prints it (§13).
+    pub fn readouts(&mut self, theme: &Theme) -> Result<Vec<Shown>, Error> {
+        let palette = |name: &str| theme.colour(name);
+        let values = self.program.state.values().to_vec();
+        let env = Env {
+            values: &values,
+            compute: &[],
+            palette: &palette,
+        };
+        let mut ev = Evaluation::new(&self.program.module, env, &mut self.cache, DEFAULT_FUEL);
+        readouts(&mut ev, &self.program)
+    }
+
     pub fn scene(&mut self, canvas: Canvas, theme: &Theme) -> Result<kinemo_ir::Scene, Error> {
         let palette = |name: &str| theme.colour(name);
         let values = self.program.state.values().to_vec();
@@ -130,6 +143,10 @@ impl Figure {
                 &marks::IDENTITY,
             )?;
         }
+        let shown = readouts(&mut ev, &self.program)?;
+        if let Some(frame) = placed.first() {
+            draw_inside(&mut b, &shown, frame, theme);
+        }
         self.warnings.clear();
         if b.labels.len() > 60 {
             self.warnings.push(
@@ -146,6 +163,105 @@ impl Figure {
 
 fn eval(ev: &mut Evaluation, c: &Compiled, bound: &[Value]) -> Result<Value, Error> {
     ev.eval(&c.checked, bound).map_err(|e| e.at_path(&c.path))
+}
+
+/// A readout as printed: its label and its value, formatted (§13).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Shown {
+    pub id: String,
+    pub label: String,
+    pub text: String,
+    /// `below`, `inside` or `none`.
+    pub place: String,
+}
+
+fn readouts(ev: &mut Evaluation, program: &Program) -> Result<Vec<Shown>, Error> {
+    let mut out = Vec::new();
+    for r in &program.readouts {
+        let src = &r.source;
+        let v = eval(ev, &r.value, &[])?;
+        let mut text = match &v {
+            Value::Bool(b) => if *b { "yes" } else { "no" }.to_string(),
+            Value::Str(s) => s.to_string(),
+            other => marks::text::show(other, src.format.as_deref()),
+        };
+        if let (Some(unit), false) = (&src.unit, v.is_nothing()) {
+            text = format!("{text} {unit}");
+        }
+        if let Some(c) = &r.compare {
+            let exact = marks::text::show(&eval(ev, c, &[])?, src.format.as_deref());
+            text = format!("≈ {text} (exact: {exact})");
+        }
+        out.push(Shown {
+            id: src.id.clone(),
+            label: src.label.clone().unwrap_or_else(|| src.id.clone()),
+            text,
+            place: src.place.clone(),
+        });
+    }
+    Ok(out)
+}
+
+/// `place: inside` readouts, as a block at the top left of the first view.
+fn draw_inside(b: &mut Builder, shown: &[Shown], frame: &Frame, theme: &Theme) {
+    let lines: Vec<String> = shown
+        .iter()
+        .filter(|s| s.place == "inside")
+        .map(|s| format!("{}: {}", s.label, s.text))
+        .collect();
+    if lines.is_empty() {
+        return;
+    }
+    const SIZE: f64 = 13.0;
+    const PAD: f64 = 6.0;
+    let sizes: Vec<[f64; 2]> = lines
+        .iter()
+        .map(|l| Builder::measure(l, SIZE, None))
+        .collect();
+    let w = sizes.iter().map(|s| s[0]).fold(0.0, f64::max);
+    let h: f64 = sizes.iter().map(|s| s[1]).sum();
+    let p = frame.mapping.plot;
+    let (left, top) = (p.left + 8.0, p.top + 8.0);
+    let panel = crate::scene::Paint {
+        fill: Some(theme.bg()),
+        fill_opacity: 0.92,
+        stroke: theme.colour("faint"),
+        width: 1.0,
+        opacity: 1.0,
+        dash: None,
+    };
+    let (r, bt) = (left + w + 2.0 * PAD, top + h + 2.0 * PAD);
+    b.polyline(
+        &[[left, top], [r, top], [r, bt], [left, bt]],
+        true,
+        &panel,
+        2.0e6,
+    );
+    let ink = crate::scene::Paint {
+        fill: theme.colour("fg"),
+        fill_opacity: 1.0,
+        opacity: 1.0,
+        ..Default::default()
+    };
+    let mut y = top + PAD;
+    for (l, [lw, lh]) in lines.iter().zip(&sizes) {
+        b.text(
+            l,
+            [left + PAD + lw / 2.0, y + lh / 2.0],
+            SIZE,
+            0.0,
+            None,
+            &ink,
+            2.0e6 + 1.0,
+        );
+        y += lh;
+    }
+    b.labels.push(crate::geom::Rect {
+        left,
+        top,
+        right: r,
+        bottom: bt,
+    });
 }
 
 /// An axis range at this state; one with no answer keeps a sane fallback.
@@ -455,5 +571,60 @@ marks:
     fn a_group_inherits_when() {
         let s = scene_of("  - group:\n      - { point: '[0, 0]' }\n    when: 't > 5'");
         assert!(s.objects.is_empty());
+    }
+
+    const SLOPE: &str = r#"
+hapto: 2
+alt: a
+values: [ { name: x, type: number, range: [-1, 3], default: 2 } ]
+let: { "f(t)": "t**2 - 2*t", slope: "derivative(f, x)", regime: "if slope > 0 then 'rising' else 'falling'" }
+view: { x: { range: [-1.5, 3.5] }, y: { range: [-1.5, 3.5] } }
+marks:
+  - { text: "{slope:+.3f}", at: "[0, 3]" }
+readouts:
+  - { id: slope, label: "slope", value: "slope", format: "+.3f", place: inside }
+  - { id: regime, label: "regime", value: "regime" }
+  - { id: area, label: "area", value: "integral(f, 0, x)", format: ".3f", unit: "m²", compare: "x**3/3 - x**2" }
+  - { id: up, label: "up", value: "slope > 0", place: none }
+  - { id: gone, label: "gone", value: "sqrt(-x)" }
+"#;
+
+    /// §13: a readout prints the same formula the drawing reads.
+    #[test]
+    fn readouts_and_the_drawing_read_the_same_let() {
+        let mut f = Figure::from_text(SLOPE).unwrap_or_else(|e| panic!("{e:?}"));
+        let theme = Theme::light();
+        let shown = f.readouts(&theme).unwrap();
+        let text = |id: &str| shown.iter().find(|s| s.id == id).unwrap().text.clone();
+        assert_eq!(text("slope"), "+2.000");
+        assert_eq!(text("regime"), "rising");
+        let minus = hapto_expr::format::format(-1.0, ".0f").unwrap();
+        let minus = minus.trim_end_matches('1');
+        assert_eq!(
+            text("area"),
+            format!("≈ {minus}1.333 m² (exact: {minus}1.333)")
+        );
+        assert_eq!(text("up"), "yes");
+        assert_eq!(text("gone"), "—");
+        // The text mark interpolates the same let.
+        let s = f.scene(Canvas::new(400.0, 200.0, 1.0), &theme).unwrap();
+        let texts: Vec<String> = s
+            .objects
+            .iter()
+            .filter(|o| o.kind == "text")
+            .filter_map(|o| match &s.signals[o.props["text"] as usize].initial {
+                kinemo_ir::Value::Str(t) => Some(t.to_string()),
+                _ => None,
+            })
+            .collect();
+        assert!(texts.iter().any(|t| t == "+2.000"), "{texts:?}");
+        assert!(
+            texts.iter().any(|t| t == "slope: +2.000"),
+            "inside: {texts:?}"
+        );
+        f.set("x", Input::Number(0.0)).unwrap();
+        let shown = f.readouts(&theme).unwrap();
+        assert_eq!(shown[0].text, format!("{minus}2.000"));
+        assert_eq!(shown[1].text, "falling");
     }
 }
