@@ -270,8 +270,29 @@ impl Builder {
         self.object("text", props, paint, z);
     }
 
-    /// The size of `text` at `size` CSS px: width, height.
+    /// The size of `text` at `size` CSS px: width, height. Inline `$…$` is
+    /// measured as the maths it typesets to, on one line.
     pub fn measure(text: &str, size: f64, wrap: Option<f64>) -> [f64; 2] {
+        if wrap.is_none() && text.matches('$').count() >= 2 {
+            let (mut w, mut h) = (0.0f64, 0.0f64);
+            for (i, part) in text.split('$').enumerate() {
+                if part.is_empty() {
+                    continue;
+                }
+                let [pw, ph] = if i % 2 == 1 {
+                    Self::measure_math(part, size, false)
+                } else {
+                    Self::measure_plain(part, size, None)
+                };
+                w += pw;
+                h = h.max(ph);
+            }
+            return [w, h];
+        }
+        Self::measure_plain(text, size, wrap)
+    }
+
+    fn measure_plain(text: &str, size: f64, wrap: Option<f64>) -> [f64; 2] {
         let opts = kinemo_text::TextOptions {
             size: 1.0,
             width: wrap.map(|w| w / size),
@@ -279,6 +300,18 @@ impl Builder {
         };
         let r = kinemo_text::measure(text, &opts);
         [(r.x1 - r.x0) * size, (r.y1 - r.y0) * size]
+    }
+
+    /// The size of a TeX formula at `size` CSS px: width, height. Zero when it
+    /// cannot be laid out, which `maths::check` refused at load already.
+    pub fn measure_math(tex: &str, size: f64, display: bool) -> [f64; 2] {
+        match kinemo_math::layout_math(tex, &crate::maths::options(display)) {
+            Ok(lay) => {
+                let k = size / crate::maths::SIZE;
+                [lay.bbox.width() * k, lay.bbox.height() * k]
+            }
+            Err(_) => [0.0, 0.0],
+        }
     }
 
     /// A TeX formula centred on `at`, `size` CSS px high. It is laid out at

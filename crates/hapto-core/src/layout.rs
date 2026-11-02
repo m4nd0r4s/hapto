@@ -103,8 +103,9 @@ fn cell(grid: &GridLayout, area: [usize; 4], width: f64, height: f64) -> Rect {
     }
 }
 
-/// Room around the plot for tick labels and axis titles (§7.2).
-fn padding(view: &View) -> [f64; 4] {
+/// Room around the plot for tick labels and axis titles (§7.2); `widest` is
+/// the widest y tick label, CSS px.
+fn padding(view: &View, widest: f64) -> [f64; 4] {
     if let Some(p) = view.padding {
         return [p; 4];
     }
@@ -115,7 +116,12 @@ fn padding(view: &View) -> [f64; 4] {
             let label_y = view.y.label.is_some() as u8 as f64 * 18.0;
             let title = view.title.is_some() as u8 as f64 * 22.0;
             // left, top, right, bottom
-            [40.0 + label_y, 14.0 + title, 18.0, 30.0 + label_x]
+            [
+                (widest + 14.0).max(40.0) + label_y,
+                14.0 + title,
+                18.0,
+                30.0 + label_x,
+            ]
         }
     }
 }
@@ -151,7 +157,20 @@ pub fn frames(
         .zip(ranges)
         .map(|(v, &(x, y))| {
             let c = cell(grid, v.area, width, height);
-            let [pl, pt, pr, pb] = padding(v);
+            let phone = width < 480.0;
+            let widest = crate::ticks::ticks(
+                &v.y.ticks,
+                y.0,
+                y.1,
+                v.y.scale == Scale::Log,
+                (c.bottom - c.top - 44.0).max(1.0),
+                phone,
+            )
+            .iter()
+            .filter_map(|t| t.label.as_deref())
+            .map(|l| Builder::measure(l, crate::ticks::SIZE, None)[0])
+            .fold(0.0, f64::max);
+            let [pl, pt, pr, pb] = padding(v, widest);
             let plot = Rect {
                 left: c.left + pl,
                 top: c.top + pt,
@@ -187,11 +206,12 @@ pub fn nice_ticks(lo: f64, hi: f64, length_px: f64, spacing: f64) -> Vec<f64> {
     }
     let target = (hi - lo) / (length_px / spacing).max(1.0);
     let mag = 10f64.powf(target.log10().floor());
+    // The step whose spacing is nearest `spacing`, in ratio.
     let step = [1.0, 2.0, 5.0, 10.0]
         .iter()
         .map(|m| m * mag)
-        .find(|s| *s >= target)
-        .unwrap_or(10.0 * mag);
+        .min_by(|a, b| (a / target).ln().abs().total_cmp(&(b / target).ln().abs()))
+        .unwrap_or(mag);
     let first = (lo / step).ceil() as i64;
     let last = (hi / step).floor() as i64;
     (first..=last)
@@ -220,26 +240,51 @@ fn hair(theme: &Theme, token: &str) -> Paint {
     }
 }
 
-/// Grid and axis lines of one view, beneath the marks.
+/// Grid and axis lines of one view, beneath the marks, then its ticks,
+/// axis labels and title.
 pub fn draw_axes(b: &mut Builder, view: &View, f: &Frame, theme: &Theme) {
     let m = &f.mapping;
     let p = m.plot;
-    let ticks = |lo: f64, hi: f64, log: bool, len: f64| {
-        if log {
-            log_ticks(lo, hi)
-        } else {
-            nice_ticks(lo, hi, len, 80.0)
-        }
-    };
     if view.grid != "none" {
-        let paint = hair(theme, "faint");
-        for x in ticks(m.x.0, m.x.1, m.x_log, p.right - p.left) {
-            let px = m.to_css([x, m.y.0])[0];
-            b.polyline(&[[px, p.top], [px, p.bottom]], false, &paint, -900.0);
+        let phone = b.canvas().css_width < 480.0;
+        let (xs, ys) = crate::ticks::of_frame(view, f, phone);
+        let major = |t: &[crate::ticks::Tick]| -> Vec<f64> {
+            t.iter()
+                .filter(|t| t.label.is_some())
+                .map(|t| t.at)
+                .collect()
+        };
+        // A minor grid divides each major step in five (linear axes).
+        let minor = |v: Vec<f64>, log: bool| -> Vec<f64> {
+            if view.grid != "minor" || log || v.len() < 2 {
+                return vec![];
+            }
+            let step = (v[1] - v[0]) / 5.0;
+            let first = v[0] - 5.0 * step;
+            (0..(v.len() as i64 + 1) * 5)
+                .map(|i| first + i as f64 * step)
+                .filter(|x| !v.iter().any(|m| (m - x).abs() < step * 1e-6))
+                .collect()
+        };
+        let (mx, my) = (major(&xs), major(&ys));
+        let faint = hair(theme, "faint");
+        let fainter = Paint {
+            opacity: 0.5,
+            ..faint.clone()
+        };
+        let in_x = |x: &f64| *x >= m.x.0.min(m.x.1) && *x <= m.x.0.max(m.x.1);
+        let in_y = |y: &f64| *y >= m.y.0.min(m.y.1) && *y <= m.y.0.max(m.y.1);
+        for (xs, paint) in [(minor(mx.clone(), m.x_log), &fainter), (mx, &faint)] {
+            for x in xs.into_iter().filter(in_x) {
+                let px = m.to_css([x, m.y.0])[0];
+                b.polyline(&[[px, p.top], [px, p.bottom]], false, paint, -900.0);
+            }
         }
-        for y in ticks(m.y.0, m.y.1, m.y_log, p.bottom - p.top) {
-            let py = m.to_css([m.x.0, y])[1];
-            b.polyline(&[[p.left, py], [p.right, py]], false, &paint, -900.0);
+        for (ys, paint) in [(minor(my.clone(), m.y_log), &fainter), (my, &faint)] {
+            for y in ys.into_iter().filter(in_y) {
+                let py = m.to_css([m.x.0, y])[1];
+                b.polyline(&[[p.left, py], [p.right, py]], false, paint, -900.0);
+            }
         }
     }
     let paint = hair(theme, "muted");
@@ -262,7 +307,7 @@ pub fn draw_axes(b: &mut Builder, view: &View, f: &Frame, theme: &Theme) {
     ])[1];
     let (horizontal, vertical) = match view.axes.as_str() {
         "cross" => (Some(zero_y), Some(zero_x)),
-        "left-bottom" => (Some(p.bottom), Some(p.left)),
+        "left-bottom" | "box" => (Some(p.bottom), Some(p.left)),
         "x" => (Some(zero_y), None),
         "y" => (None, Some(zero_x)),
         _ => (None, None),
@@ -279,13 +324,15 @@ pub fn draw_axes(b: &mut Builder, view: &View, f: &Frame, theme: &Theme) {
             &paint,
             -800.0,
         );
+    } else {
+        if let Some(y) = horizontal {
+            b.polyline(&[[p.left, y], [p.right, y]], false, &paint, -800.0);
+        }
+        if let Some(x) = vertical {
+            b.polyline(&[[x, p.top], [x, p.bottom]], false, &paint, -800.0);
+        }
     }
-    if let Some(y) = horizontal {
-        b.polyline(&[[p.left, y], [p.right, y]], false, &paint, -800.0);
-    }
-    if let Some(x) = vertical {
-        b.polyline(&[[x, p.top], [x, p.bottom]], false, &paint, -800.0);
-    }
+    crate::ticks::draw(b, view, f, theme, horizontal, vertical);
 }
 
 #[cfg(test)]

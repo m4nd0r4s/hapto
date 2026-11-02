@@ -26,5 +26,6 @@ pub mod state;
 pub mod style;
 pub mod text;
 pub mod theme;
+pub mod ticks;
 pub mod tree;
 pub mod v1;
