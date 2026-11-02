@@ -11,8 +11,12 @@ pub fn draws(kind: &str) -> bool {
     matches!(kind, "text" | "math")
 }
 
+/// Labels draw above every mark, so no line covers one (z of marks is their
+/// document order or an author's `z`, far below this).
+const LABEL_Z: f64 = 1.0e6;
+
 /// The smallest text drawn, in CSS px (§10.5).
-const FLOOR: f64 = 11.0;
+pub(crate) const FLOOR: f64 = 11.0;
 
 /// A value as text: numbers through the spec, or four significant digits.
 pub fn show(v: &Value, spec: Option<&str>) -> String {
@@ -72,7 +76,7 @@ fn shift(anchor: &str) -> (f64, f64) {
 /// Draw text with a halo of the background behind it, for legibility over
 /// data (§9.2).
 #[allow(clippy::too_many_arguments)]
-fn put(
+pub(crate) fn put(
     b: &mut Builder,
     text: &str,
     centre: [f64; 2],
@@ -119,27 +123,18 @@ pub fn draw(c: &mut Ctx) -> Result<(), Error> {
     let p = c.css(at);
     let ink = c.paint.fill.or(c.palette("fg"));
     let bg = c.palette("bg").unwrap_or([1.0; 4]);
-    if c.m.source.kind == "math" {
-        let Some(tex) = c.template("main")? else {
-            return Ok(());
-        };
-        c.b.math(
-            &tex,
-            [p[0] + offset[0], p[1] - offset[1]],
-            size,
-            true,
-            ink.unwrap_or([0.0, 0.0, 0.0, 1.0]),
-            c.z,
-        );
-        return Ok(());
-    }
+    let math = c.m.source.kind == "math";
     let Some(mut text) = c.template("main")? else {
         return Ok(());
     };
-    if c.word("weight", "regular") == "bold" {
+    if !math && c.word("weight", "regular") == "bold" {
         text = format!("**{text}**");
     }
-    let [w, h] = Builder::measure(&text, size, wrap);
+    let [w, h] = if math {
+        Builder::measure_math(&text, size, true)
+    } else {
+        Builder::measure(&text, size, wrap)
+    };
     let (sx, sy) = shift(&anchor);
     let centre = [
         p[0] + offset[0] + sx * w / 2.0,
@@ -168,12 +163,17 @@ pub fn draw(c: &mut Ctx) -> Result<(), Error> {
             c.z - 0.01,
         );
     }
-    let halo = c.m.style.halo.is_none()
-        || matches!(
-            c.m.style.halo.clone().map(|h| c.eval(&h)),
-            Some(Ok(Value::Bool(true)))
-        );
-    put(c.b, &text, centre, size, rotate, wrap, ink, bg, halo, c.z);
+    if math {
+        let colour = ink.unwrap_or([0.0, 0.0, 0.0, 1.0]);
+        c.b.math(&text, centre, size, true, colour, c.z);
+    } else {
+        let halo = c.m.style.halo.is_none()
+            || matches!(
+                c.m.style.halo.clone().map(|h| c.eval(&h)),
+                Some(Ok(Value::Bool(true)))
+            );
+        put(c.b, &text, centre, size, rotate, wrap, ink, bg, halo, c.z);
+    }
     c.b.labels.push(Rect {
         left: centre[0] - w / 2.0,
         top: centre[1] - h / 2.0,
@@ -191,6 +191,9 @@ fn overlap(a: &Rect, b: &Rect) -> f64 {
 
 /// The point a label attaches to, in CSS px, by the mark's kind (§10.3).
 fn label_anchor(c: &mut Ctx) -> Result<Option<[f64; 2]>, Error> {
+    if c.m.source.kind == "function" {
+        return Ok(c.anchor);
+    }
     let main = c.main()?;
     let points: Option<Vec<[f64; 2]>> = main
         .items()
@@ -223,22 +226,6 @@ fn label_anchor(c: &mut Ctx) -> Result<Option<[f64; 2]>, Error> {
                 p.iter().map(|q| q[1]).sum::<f64>() / n,
             ])
         }),
-        "function" => {
-            // The last visible point: just inside the right edge of the view.
-            let x = c.map.x.1 - (c.map.x.1 - c.map.x.0) * 0.02;
-            match c.m.main.formula() {
-                Some(f) => {
-                    let mut bound = c.bound.to_vec();
-                    bound.push(Value::Num(x));
-                    let y =
-                        c.ev.eval(&f.checked, &bound)
-                            .map_err(|e| e.at_path(&f.path))?
-                            .num();
-                    y.is_finite().then(|| c.css([x, y]))
-                }
-                None => None,
-            }
-        }
         _ => main.vec().map(|v| c.css(v)),
     })
 }
@@ -261,7 +248,7 @@ pub fn label(c: &mut Ctx) -> Result<(), Error> {
     let [w, h] = Builder::measure(&text, size, None);
     let gap = 6.0;
     let candidates = if c.m.source.kind == "function" {
-        vec![(1.0, 0.0)]
+        vec![(1.0, 0.0), (-1.0, 1.0), (-1.0, -1.0)]
     } else {
         vec![(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)]
     };
@@ -278,7 +265,14 @@ pub fn label(c: &mut Ctx) -> Result<(), Error> {
     let chosen = candidates
         .iter()
         .map(|d| rect_for(*d))
-        .find(|r| c.b.labels.iter().all(|o| overlap(r, o) <= 0.3 * w * h))
+        .find(|r| {
+            let canvas = c.b.canvas();
+            let fits = r.left >= 0.0
+                && r.top >= 0.0
+                && r.right <= canvas.css_width
+                && r.bottom <= canvas.css_height;
+            fits && c.b.labels.iter().all(|o| overlap(r, o) <= 0.3 * w * h)
+        })
         .unwrap_or_else(|| rect_for(candidates[0]));
     let centre = [
         (chosen.left + chosen.right) / 2.0,
@@ -296,7 +290,7 @@ pub fn label(c: &mut Ctx) -> Result<(), Error> {
         ink,
         bg,
         true,
-        c.z + 0.5,
+        LABEL_Z + c.z,
     );
     c.b.labels.push(chosen);
     Ok(())
@@ -375,5 +369,56 @@ mod tests {
         let doc = "hapto: 2\nalt: a\nvalues: [ { name: s, type: number, range: [0, 2], default: 1 } ]\nview: { x: { range: [0, 1] }, y: { range: [0, 1] } }\nmarks: [ { math: 'x = {s:.2f}', at: '[0.5, 0.5]' } ]";
         let e = Figure::from_text(doc).err().unwrap();
         assert_eq!(e[0].code.0, "E107");
+    }
+
+    fn props(s: &kinemo_ir::Scene, kind: &str, prop: &str) -> Vec<f64> {
+        s.objects
+            .iter()
+            .filter(|o| o.kind == kind)
+            .filter_map(|o| o.props.get(prop))
+            .map(|id| s.signals[*id as usize].initial.as_f64())
+            .collect()
+    }
+
+    #[test]
+    fn a_function_leaving_the_plot_keeps_its_label() {
+        // x**2 - 2x leaves y <= 3.5 at x = 3, before the view's right edge.
+        let doc = "hapto: 2\nalt: a\nlet: { 'f(t)': 't**2 - 2*t' }\nview: { x: { range: [-1.5, 3.5] }, y: { range: [-1.5, 3.5] }, axes: none }\nmarks: [ { function: 'f(x)', var: x, label: 'f' } ]";
+        let mut f = Figure::from_text(doc).unwrap();
+        let s = f
+            .scene(Canvas::new(400.0, 200.0, 1.0), &Theme::light())
+            .unwrap();
+        let xs = props(&s, "text", "x");
+        // Halo and ink, inside the frame (16 units wide, centred on 0).
+        assert_eq!(xs.len(), 2, "the label was lost");
+        assert!(xs.iter().all(|x| x.abs() < 8.0), "{xs:?}");
+    }
+
+    #[test]
+    fn labels_draw_above_every_mark() {
+        let doc = "hapto: 2\nalt: a\nlet: { 'f(t)': 't**2' }\nview: { x: { range: [-2, 2] }, y: { range: [-1, 4] }, axes: none }\nmarks:\n  - { point: '[1, 1]', label: 'P' }\n  - { tangent: 1, of: f }";
+        let mut f = Figure::from_text(doc).unwrap();
+        let s = f
+            .scene(Canvas::new(400.0, 200.0, 1.0), &Theme::light())
+            .unwrap();
+        let label = props(&s, "text", "z");
+        let lines = props(&s, "polyline", "z");
+        let top_line = lines.iter().cloned().fold(f64::MIN, f64::max);
+        assert!(label.iter().all(|z| *z > top_line), "{label:?} {lines:?}");
+    }
+
+    #[cfg(feature = "typeset")]
+    #[test]
+    fn maths_honours_its_anchor() {
+        let x_for = |anchor: &str| {
+            let doc = format!("hapto: 2\nalt: a\nview: {{ x: {{ range: [0, 10] }}, y: {{ range: [0, 10] }}, axes: none }}\nmarks: [ {{ math: '\\frac{{a}}{{b}} + c', at: '[5, 5]', anchor: {anchor} }} ]");
+            let mut f = Figure::from_text(&doc).unwrap();
+            let s = f
+                .scene(Canvas::new(400.0, 200.0, 1.0), &Theme::light())
+                .unwrap();
+            props(&s, "math", "x")[0]
+        };
+        let (left, centre, right) = (x_for("left"), x_for("center"), x_for("right"));
+        assert!(left > centre && centre > right, "{left} {centre} {right}");
     }
 }

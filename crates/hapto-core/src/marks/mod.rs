@@ -25,6 +25,9 @@ pub struct Ctx<'a, 'e> {
     pub z: f64,
     pub bound: &'a [Value],
     pub paint: Paint,
+    /// Where the label attaches, when drawing the mark found it (a function's
+    /// last visible point); otherwise each kind's own rule (§10.3).
+    pub anchor: Option<[f64; 2]>,
 }
 
 impl Ctx<'_, '_> {

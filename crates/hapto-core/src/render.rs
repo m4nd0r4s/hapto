@@ -238,6 +238,7 @@ fn draw(
             z: m.source.common.z.unwrap_or(z),
             bound: &bound,
             paint,
+            anchor: None,
         };
         marks::draw(&mut ctx)?;
     }

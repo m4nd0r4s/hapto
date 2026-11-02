@@ -147,6 +147,14 @@ pub fn draw(c: &mut Ctx) -> Result<(), Error> {
     for run in runs.iter().filter(|r| r.len() > 1) {
         plot.c.stroke(run, false);
     }
+    // The label goes at the last point the reader can see (§10.3).
+    let inside = plot_rect.grow(0.5);
+    plot.c.anchor = runs
+        .iter()
+        .flatten()
+        .rev()
+        .find(|p| inside.contains(**p))
+        .copied();
     Ok(())
 }
 
