@@ -29,6 +29,10 @@ impl Figure {
             crate::maths::register(json).map_err(|e| vec![e])?;
         }
         let program = Program::new(doc)?;
+        let unbaked = crate::maths::check_document(&program.doc);
+        if !unbaked.is_empty() {
+            return Err(unbaked);
+        }
         let cache = Cache::new(&program.module);
         Ok(Figure {
             program,

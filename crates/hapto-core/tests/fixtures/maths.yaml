@@ -1,0 +1,7 @@
+hapto: 2
+id: baked
+alt: "A formula, baked."
+view: { x: { range: [0, 1] }, y: { range: [0, 1] }, axes: none }
+marks:
+  - { math: "\\frac{\\partial H}{\\partial q} = -\\dot p", at: "[0.5, 0.5]", size: 40 }
+  - { text: "with $x^2$ inline", at: "[0.5, 0.2]" }
