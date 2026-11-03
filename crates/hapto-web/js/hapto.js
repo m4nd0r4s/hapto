@@ -11,27 +11,16 @@
 // element connects; the document is fetched, read and drawn once the figure
 // comes within a viewport height of the screen (or at once with `eager`);
 // a figure more than three viewport heights away gives up its canvas for an
-// image of its last frame; disconnecting frees it. One wasm module serves
-// every figure on the page.
+// image of its last frame; disconnecting frees it.
 //
-// The engine runs on the main thread for now; the render worker
-// (hapto.worker.js, §15.8) replaces it behind the same calls.
+// Rendering (§15.8): one worker (hapto.worker.js) owns the wasm module and
+// every figure. Each canvas is transferred to it as an OffscreenCanvas when
+// the browser can; otherwise the worker posts ImageBitmaps (or RGBA) that
+// the page draws. Every set and drag move of an animation frame goes out
+// as one frame request, and a figure has at most one frame in flight, so
+// only the newest state is ever drawn.
 
 const HERE = new URL(".", import.meta.url);
-
-// ---------------------------------------------------------------- engine
-
-let engine = null;
-
-/// The wasm module, loaded once for the whole page.
-function load_engine() {
-  engine ??= (async () => {
-    const glue = await import(new URL("hapto_wasm.js", HERE).href);
-    await glue.default({ module_or_path: new URL("hapto.wasm", HERE) });
-    return glue;
-  })();
-  return engine;
-}
 
 // ---------------------------------------------------------------- helpers
 
@@ -116,33 +105,203 @@ function shown(v) {
   return String(v);
 }
 
+// ---------------------------------------------------------------- frames
+
+/// The interaction budget of §19.1: a frame slower than this while input
+/// is active makes the next ones half resolution.
+export const BUDGET_MS = 16;
+/// How long after the last input the full-resolution frame comes.
+export const SETTLE_MS = 150;
+
+/// One figure's frames: coalesces sets and drag moves into the next
+/// animation frame, keeps one frame in flight, and picks its quality
+/// (§15.8). `send(request)` posts a frame; `drawn(ms)` reports it back.
+export class Scheduler {
+  constructor(
+    send,
+    { now = () => performance.now(), frame = (f) => requestAnimationFrame(f), later = (f, ms) => setTimeout(f, ms), budget = BUDGET_MS } = {},
+  ) {
+    this.send = send;
+    this.budget = budget;
+    this.now = now;
+    this.frame = frame;
+    this.later = later;
+    this.state = {};
+    this.drag = null;
+    this.ending = null;
+    this.dirty = false;
+    this.inflight = false;
+    this.scheduled = false;
+    this.input = -Infinity; // when the last interactive input came
+    this.last_ms = 0; // how long the last frame took
+    this.quality = 1; // of the last frame sent
+    this.settle = null;
+  }
+
+  /// Values to set with the next frame; `interactive` for pointer input.
+  set(state, interactive = false) {
+    Object.assign(this.state, state);
+    if (interactive) this.input = this.now();
+    this.request();
+  }
+
+  /// A drag move: only the newest one matters.
+  drag_to(mark, x, y) {
+    this.drag = { mark, x, y };
+    this.input = this.now();
+    this.request();
+  }
+
+  /// Let go of a drag after its last move, in the same frame.
+  release(mark) {
+    this.ending = mark;
+    this.request();
+  }
+
+  /// Something other than state changed (size, theme, a canvas back).
+  invalidate() {
+    this.request();
+  }
+
+  request() {
+    this.dirty = true;
+    if (this.scheduled) return;
+    this.scheduled = true;
+    this.frame(() => {
+      this.scheduled = false;
+      this.flush();
+    });
+  }
+
+  flush() {
+    if (this.inflight || !this.dirty) return;
+    const active = this.now() - this.input < SETTLE_MS;
+    const quality = active && this.last_ms > this.budget ? 0.5 : 1;
+    const request = { state: this.state, drag: this.drag, end: this.ending, quality };
+    this.state = {};
+    this.drag = null;
+    this.ending = null;
+    this.ending = null;
+    this.dirty = false;
+    this.inflight = true;
+    this.quality = quality;
+    this.send(request);
+  }
+
+  /// The frame in flight is on screen; send the next if one is waiting,
+  /// and come back at full resolution once the input has settled.
+  drawn(ms) {
+    this.inflight = false;
+    // A half-resolution frame says little about a full one.
+    this.last_ms = this.quality < 1 ? ms * 4 : ms;
+    if (this.dirty) {
+      this.request();
+      return;
+    }
+    if (this.quality < 1) {
+      clearTimeout(this.settle);
+      const wait = Math.max(0, SETTLE_MS - (this.now() - this.input));
+      this.settle = this.later(() => {
+        this.settle = null;
+        if (this.now() - this.input >= SETTLE_MS) this.request();
+        else this.drawn(this.last_ms / 4); // more input came; wait again
+      }, wait);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- the worker
+
+/// The page's one render worker, and the figures listening to it.
+class Engine {
+  constructor() {
+    this.worker = new Worker(new URL("hapto.worker.js", HERE), { type: "module" });
+    this.figures = new Map();
+    this.waiting = new Map();
+    this.seq = 0;
+    this.worker.onmessage = (e) => this.receive(e.data);
+    this.worker.onerror = (e) => console.error("hapto: the render worker failed:", e.message ?? e);
+  }
+
+  post(msg, transfer) {
+    this.worker.postMessage(msg, transfer ?? []);
+  }
+
+  /// A message with a reply: resolves with it.
+  ask(msg) {
+    const seq = ++this.seq;
+    return new Promise((resolve, reject) => {
+      this.waiting.set(seq, { resolve, reject });
+      this.post({ ...msg, seq });
+    });
+  }
+
+  receive(msg) {
+    const waiting = msg.seq !== undefined && this.waiting.get(msg.seq);
+    if (waiting) {
+      this.waiting.delete(msg.seq);
+      if (msg.op === "error") waiting.reject(Object.assign(new Error(msg.error.message), msg.error));
+      else waiting.resolve(msg);
+      return;
+    }
+    this.figures.get(msg.id)?._worker(msg);
+  }
+}
+
+let engine = null;
+const ids = { next: 0 };
+
+// ---------------------------------------------------------------- config
+
+/// `?hapto-render=bitmap` (or `hapto.config.render = "bitmap"`) draws with
+/// ImageBitmaps even where OffscreenCanvas exists; `rgba` sends raw pixels.
+/// Both paths must work (§15.8); this is how they are tested.
+const config = {
+  /// The frame budget under input; lower it to see progressive quality.
+  budget_ms: BUDGET_MS,
+  render: (typeof location !== "undefined" && new URLSearchParams(location.search).get("hapto-render")) || "auto",
+};
+
+function offscreen() {
+  return config.render === "auto" && "transferControlToOffscreen" in HTMLCanvasElement.prototype;
+}
+
 // ---------------------------------------------------------------- observers
 
-// Near: within one viewport height, so the first frame is ready on arrival.
-const near = new IntersectionObserver(
-  (entries) => entries.forEach((e) => e.isIntersecting && e.target._near()),
-  { rootMargin: "100% 0px" },
-);
-// Far: more than three viewport heights away, the canvas may go (§15.3 step 4).
-const far = new IntersectionObserver(
-  (entries) => entries.forEach((e) => (e.isIntersecting ? e.target._back() : e.target._away())),
-  { rootMargin: "300% 0px" },
-);
-const resized = new ResizeObserver((entries) =>
-  entries.forEach((e) => e.target.closest("hapto-figure")?._resize()),
-);
+let observers = null;
+
+function watch() {
+  observers ??= {
+    // Near: within one viewport height, so the first frame is ready on arrival.
+    near: new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && e.target._near()),
+      { rootMargin: "100% 0px" },
+    ),
+    // Far: more than three viewport heights away, the canvas may go (§15.3 step 4).
+    far: new IntersectionObserver(
+      (entries) => entries.forEach((e) => (e.isIntersecting ? e.target._back() : e.target._away())),
+      { rootMargin: "300% 0px" },
+    ),
+    resized: new ResizeObserver((entries) =>
+      entries.forEach((e) => e.target.closest("hapto-figure")?._resize()),
+    ),
+  };
+  return observers;
+}
 
 // ---------------------------------------------------------------- the element
 
 const live = new Set();
 
-class HaptoFigure extends HTMLElement {
+class HaptoFigure extends (globalThis.HTMLElement ?? class {}) {
   constructor() {
     super();
-    this.figure = null;
+    this.key = ++ids.next;
     // idle → loading → live ⇄ released, or failed
     this.state = "idle";
     this.syncs = new Map();
+    this.drawn = false;
+    this.frame_count = 0;
     this.ready = new Promise((resolve, reject) => {
       this._resolve = resolve;
       this._reject = reject;
@@ -183,37 +342,49 @@ class HaptoFigure extends HTMLElement {
     this.append(this.readouts, this.controls, this.error);
 
     live.add(this);
-    resized.observe(this.stage);
-    far.observe(this);
+    const o = watch();
+    o.resized.observe(this.stage);
+    o.far.observe(this);
     if (this.hasAttribute("eager")) this._near();
-    else near.observe(this);
+    else o.near.observe(this);
   }
 
   disconnectedCallback() {
     // A move within the page disconnects and reconnects at once.
     queueMicrotask(() => {
       if (this.isConnected) return;
-      near.unobserve(this);
-      far.unobserve(this);
-      resized.unobserve(this.stage);
+      const o = watch();
+      o.near.unobserve(this);
+      o.far.unobserve(this);
+      o.resized.unobserve(this.stage);
       live.delete(this);
-      this.figure?.free();
-      this.figure = null;
+      if (engine?.figures.has(this.key)) {
+        engine.post({ op: "free", id: this.key });
+        engine.figures.delete(this.key);
+      }
       this.state = "idle";
       if (this.snapshot) URL.revokeObjectURL(this.snapshot);
     });
   }
 
   async _near() {
-    near.unobserve(this);
+    watch().near.unobserve(this);
     if (this.state !== "idle") return;
     this.state = "loading";
     try {
       const text = await this._text();
-      const wasm = await load_engine();
+      const state = {};
+      const initial = this.getAttribute("state");
+      if (initial) Object.assign(state, this._own(parse_assignments(initial)));
+      state.theme = page_theme();
+      engine ??= new Engine();
+      engine.figures.set(this.key, this);
       const format = this.source?.type.endsWith("json") ? "json" : "yaml";
-      this.figure = wasm.Figure.load(text, format);
-      const meta = this.figure.meta();
+      const loaded = await new Promise((resolve, reject) => {
+        this._loading = { resolve, reject };
+        engine.post({ op: "load", id: this.key, text, format, state });
+      });
+      const { meta, values } = loaded;
       if (this.id && meta.id && meta.id !== this.id) {
         throw Object.assign(
           new Error(`E410: this element is "${this.id}" and its document is "${meta.id}"`),
@@ -223,14 +394,19 @@ class HaptoFigure extends HTMLElement {
       // The document's id names the element, unless another figure has it.
       if (!this.id && meta.id && !document.getElementById(meta.id)) this.id = meta.id;
       this.size = meta.size;
-      this.figure.setState({ theme: page_theme() });
-      const initial = this.getAttribute("state");
-      if (initial) this._apply(parse_assignments(initial));
+      this.values = values.values;
+      this.warnings = loaded.warnings;
       this._build_controls();
+      this.frames = new Scheduler((request) => this._send(request), { budget: config.budget_ms });
+      if (offscreen()) {
+        const canvas = this.canvas.transferControlToOffscreen();
+        engine.post({ op: "canvas", id: this.key, canvas }, [canvas]);
+        this.transferred = true;
+      }
+      this._pointer();
       this.state = "live";
       this._shape();
-      this._draw();
-      this._resolve(this);
+      this.frames.invalidate();
     } catch (e) {
       this._fail(e);
     }
@@ -251,14 +427,14 @@ class HaptoFigure extends HTMLElement {
   }
 
   /// Assignments by name; a `figure.name` for another figure is not ours.
-  _apply(pairs) {
+  _own(pairs) {
     const state = {};
     for (const [name, value] of pairs) {
       const dot = name.indexOf(".");
       if (dot >= 0 && name.slice(0, dot) !== this.id) continue;
       state[dot >= 0 ? name.slice(dot + 1) : name] = value;
     }
-    return this.figure.setState(state);
+    return state;
   }
 
   /// The box's shape from the document's size rules (§7.6).
@@ -275,39 +451,74 @@ class HaptoFigure extends HTMLElement {
   _resize() {
     if (this.state !== "live") return;
     this._shape();
-    this._schedule();
+    this.frames.invalidate();
   }
 
-  /// At most one render per animation frame; only the newest state draws.
-  _schedule() {
-    this.frame ??= requestAnimationFrame(() => {
-      this.frame = null;
-      this._draw();
+  _dpr() {
+    const cap = Number(this.dataset.dprCap) || 2;
+    return Math.min(globalThis.devicePixelRatio || 1, cap);
+  }
+
+  /// Post the scheduler's frame with the box's size at this moment.
+  _send(request) {
+    const width = this.stage.clientWidth;
+    const height = this.stage.clientHeight;
+    if (this.state !== "live" || width === 0 || height === 0) {
+      this.frames.drawn(0);
+      return;
+    }
+    engine.post({
+      op: "frame",
+      id: this.key,
+      frame: ++this.frame_count,
+      ...request,
+      width,
+      height,
+      dpr: this._dpr(),
+      rgba: config.render === "rgba",
     });
   }
 
-  _draw() {
-    if (this.state !== "live") return;
-    const f = this.figure;
-    const width = this.stage.clientWidth;
-    const height = this.stage.clientHeight;
-    if (width === 0 || height === 0) return;
-    const cap = Number(this.dataset.dprCap) || 2;
-    f.resize(width, height, Math.min(devicePixelRatio || 1, cap));
-    if (this.canvas.width !== f.pixelWidth) this.canvas.width = f.pixelWidth;
-    if (this.canvas.height !== f.pixelHeight) this.canvas.height = f.pixelHeight;
-    // Readouts before pixels (§15.8).
-    this._show(f.evaluate());
-    const rgba = f.render();
-    const pixels = new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.length);
-    this.canvas.getContext("2d").putImageData(new ImageData(pixels, f.pixelWidth), 0, 0);
-    if (this.canvas.hidden) {
-      this.canvas.hidden = false;
-      this.fallback.hidden = true;
+  /// What the worker says about this figure.
+  _worker(msg) {
+    switch (msg.op) {
+      case "loaded":
+        this._loading?.resolve(msg);
+        return;
+      case "failed":
+        this._loading?.reject(Object.assign(new Error(msg.error.message), msg.error));
+        return;
+      case "evaluated":
+        this._evaluated(msg);
+        return;
+      case "drawn":
+        this._drawn(msg);
+        return;
+      case "snapshot":
+        this._snapshot(msg.blob);
+        return;
+      case "error":
+        console.error(`hapto: ${this.id || "a figure"}: ${msg.of} failed:`, msg.error);
+        this.dispatchEvent(new CustomEvent("hapto:error", { detail: msg.error, bubbles: true }));
+        if (msg.of === "frame") this.frames?.drawn(0);
+        return;
     }
   }
 
-  _show({ readouts, alt }) {
+  _evaluated({ set, refused, readouts, alt, values }) {
+    if (refused) {
+      console.error(`hapto: ${this.id || "a figure"} refused a set:`, refused);
+      this.dispatchEvent(new CustomEvent("hapto:error", { detail: refused, bubbles: true }));
+    }
+    this.values = values.values;
+    for (const v of this.values) this.syncs.get(v.name)?.(v.value);
+    for (const [name, { value }] of Object.entries(set)) {
+      if (name === "theme" || name === "focus") continue;
+      this.dispatchEvent(
+        new CustomEvent("hapto:change", { detail: { name, value, source: this.source_of(name) }, bubbles: true }),
+      );
+    }
+    this.sources = {};
     this.canvas.setAttribute("aria-label", alt);
     if (this.getAttribute("readouts") === "none") return;
     this.readouts.replaceChildren(
@@ -322,11 +533,51 @@ class HaptoFigure extends HTMLElement {
     );
   }
 
+  source_of(name) {
+    return this.sources?.[name] ?? "drag";
+  }
+
+  _drawn(msg) {
+    if (!this.transferred && this.state === "live") {
+      const ctx = this.canvas.getContext("2d");
+      if (msg.bitmap) {
+        // Full resolution backing store; a half-resolution frame scales up.
+        const full = [Math.round(this.stage.clientWidth * this._dpr()), Math.round(this.stage.clientHeight * this._dpr())];
+        if (this.canvas.width !== full[0]) this.canvas.width = full[0];
+        if (this.canvas.height !== full[1]) this.canvas.height = full[1];
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(msg.bitmap, 0, 0, this.canvas.width, this.canvas.height);
+        msg.bitmap.close();
+      } else if (msg.rgba) {
+        if (this.canvas.width !== msg.width) this.canvas.width = msg.width;
+        if (this.canvas.height !== msg.height) this.canvas.height = msg.height;
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(msg.rgba), msg.width), 0, 0);
+      }
+    }
+    this.last = { ms: msg.ms, quality: msg.quality, width: msg.width, height: msg.height };
+    this.frames_drawn = (this.frames_drawn ?? 0) + 1;
+    if (this.state === "live" && this.canvas.hidden) {
+      this.canvas.hidden = false;
+      this.fallback.hidden = true;
+    }
+    if (!this.drawn) {
+      this.drawn = true;
+      this._resolve(this);
+    }
+    this.frames.drawn(msg.ms);
+  }
+
+  /// Set values from the page: a control, the prose, the API.
+  _set(state, source, interactive = false) {
+    this.sources = { ...this.sources };
+    for (const name of Object.keys(state)) this.sources[name] = source;
+    this.frames.set(state, interactive);
+  }
+
   /// One control per value (§12.1): a basic set, which hapto-hl7.6 refines.
   _build_controls() {
     if (this.getAttribute("controls") === "none") return;
-    const { values } = this.figure.values();
-    for (const v of values) {
+    for (const v of this.values) {
       if (v.control?.type === "none" || v.type === "point") continue; // points drag (hl7.8)
       const row = element("label", "hapto-control", this.controls);
       element("span", "hapto-control-label", row).textContent = (v.label ?? v.name).replace(/\$/g, "");
@@ -346,16 +597,17 @@ class HaptoFigure extends HTMLElement {
     input.step = log ? (Math.log(hi) - Math.log(lo)) / 1000 : v.step;
     const out = element("output", "hapto-control-value", row);
     const sync = (value) => {
-      input.value = log ? Math.log(value) : value;
+      // Not while the reader holds it: the thumb is theirs.
+      if (document.activeElement !== input || !this.holding) input.value = log ? Math.log(value) : value;
       out.textContent = shown(value) + (v.unit ? ` ${v.unit}` : "");
       input.setAttribute("aria-valuetext", out.textContent);
     };
     sync(v.value);
+    input.addEventListener("pointerdown", () => (this.holding = true));
+    input.addEventListener("pointerup", () => (this.holding = false));
     input.addEventListener("input", () => {
       const n = Number(input.value);
-      const set = this.figure.setState({ [v.name]: log ? Math.exp(n) : n });
-      sync(set[v.name].value);
-      this._changed(v.name, set[v.name].value, "control");
+      this._set({ [v.name]: log ? Math.exp(n) : n }, "control", this.holding);
     });
     this.syncs.set(v.name, sync);
   }
@@ -366,11 +618,7 @@ class HaptoFigure extends HTMLElement {
       const b = element("button", "", group);
       b.type = "button";
       b.textContent = v.labels?.[option] ?? option;
-      b.addEventListener("click", () => {
-        this.figure.setState({ [v.name]: option });
-        sync(option);
-        this._changed(v.name, option, "control");
-      });
+      b.addEventListener("click", () => this._set({ [v.name]: option }, "control"));
       return [option, b];
     });
     const sync = (value) =>
@@ -383,39 +631,82 @@ class HaptoFigure extends HTMLElement {
     const box = element("input", "", row);
     box.type = "checkbox";
     box.checked = v.value;
-    box.addEventListener("change", () => {
-      this.figure.setState({ [v.name]: box.checked });
-      this._changed(v.name, box.checked, "control");
-    });
+    box.addEventListener("change", () => this._set({ [v.name]: box.checked }, "control"));
     this.syncs.set(v.name, (value) => (box.checked = value));
   }
 
-  _changed(name, value, source) {
-    this._schedule();
-    this.dispatchEvent(
-      new CustomEvent("hapto:change", { detail: { name, value, source }, bubbles: true }),
-    );
+  /// Dragging marks (§12.4): hapto tests the hit against its own geometry;
+  /// moves ride on frames, so a fast pointer never queues stale ones.
+  /// Keyboard and touch details come with hapto-hl7.8.
+  _pointer() {
+    const where = (e) => {
+      const r = this.stage.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
+    };
+    let held = null;
+    let hovering = false;
+    this.stage.addEventListener("pointerdown", async (e) => {
+      if (this.state !== "live") return;
+      const [x, y] = where(e);
+      const { hit } = await engine.ask({ op: "hit", id: this.key, x, y, pointer: e.pointerType });
+      if (!hit?.drag) return;
+      held = hit.mark;
+      engine.post({ op: "drag", id: this.key, mark: held, phase: "start", x, y });
+      this.stage.setPointerCapture?.(e.pointerId);
+      this.stage.dataset.cursor = "grabbing";
+    });
+    this.stage.addEventListener("pointermove", async (e) => {
+      if (this.state !== "live") return;
+      const [x, y] = where(e);
+      if (held) {
+        this.frames.drag_to(held, x, y);
+        return;
+      }
+      if (hovering || e.pointerType === "touch") return; // one hover test at a time
+      hovering = true;
+      const { hit } = await engine.ask({ op: "hit", id: this.key, x, y, pointer: e.pointerType });
+      hovering = false;
+      if (!held) this.stage.dataset.cursor = hit?.drag ? "grab" : "";
+    });
+    const release = () => {
+      if (!held) return;
+      // The end rides on the next frame, after the last move.
+      this.frames.release(held);
+      held = null;
+      this.stage.dataset.cursor = "grab";
+    };
+    this.stage.addEventListener("pointerup", release);
+    this.stage.addEventListener("pointercancel", release);
   }
 
   /// Far away: keep the state, give up the canvas for an image of it.
   _away() {
     if (this.state !== "live") return;
     this.state = "released";
+    if (this.transferred) {
+      engine.post({ op: "snapshot", id: this.key });
+      return;
+    }
     this.canvas.toBlob((blob) => {
       if (this.state !== "released" || !blob) return;
-      if (this.snapshot) URL.revokeObjectURL(this.snapshot);
-      this.snapshot = URL.createObjectURL(blob);
-      this.fallback.src = this.snapshot;
-      this.fallback.hidden = false;
-      this.canvas.hidden = true;
+      this._snapshot(blob);
       this.canvas.width = this.canvas.height = 0;
     });
+  }
+
+  _snapshot(blob) {
+    if (this.state !== "released") return;
+    if (this.snapshot) URL.revokeObjectURL(this.snapshot);
+    this.snapshot = URL.createObjectURL(blob);
+    this.fallback.src = this.snapshot;
+    this.fallback.hidden = false;
+    this.canvas.hidden = true;
   }
 
   _back() {
     if (this.state !== "released") return;
     this.state = "live";
-    this._draw();
+    this.frames.invalidate();
   }
 
   /// The fallback stays, a notice says so, the console has the rest (§15.12).
@@ -430,20 +721,34 @@ class HaptoFigure extends HTMLElement {
   }
 }
 
-customElements.define("hapto-figure", HaptoFigure);
+if (globalThis.customElements && !customElements.get("hapto-figure")) {
+  customElements.define("hapto-figure", HaptoFigure);
+}
 
 // ---------------------------------------------------------------- the page
 
-/// Counters for development and the benchmark harness: figures by state
-/// and the bytes their canvases hold.
+/// Counters for development and the benchmark harness: figures by state,
+/// the bytes their page-side canvases hold, and how the last frames went.
 function stats() {
   const states = {};
   let canvasBytes = 0;
   for (const f of live) {
     states[f.state] = (states[f.state] ?? 0) + 1;
-    canvasBytes += f.canvas.width * f.canvas.height * 4;
+    if (!f.transferred) canvasBytes += f.canvas.width * f.canvas.height * 4;
   }
-  return { figures: live.size, states, canvasBytes };
+  return {
+    figures: live.size,
+    states,
+    canvasBytes,
+    path: config.render === "auto" ? (globalThis.HTMLCanvasElement && offscreen() ? "offscreen" : "bitmap") : config.render,
+  };
 }
 
-export const hapto = { stats, ready: load_engine };
+/// What a pointer at CSS (x, y) would take hold of in a figure: the hit
+/// test a click makes, for tests and development tools.
+async function hit(figure, x, y, pointer = "mouse") {
+  if (!engine || figure.state !== "live") return null;
+  return (await engine.ask({ op: "hit", id: figure.key, x, y, pointer })).hit;
+}
+
+export const hapto = { stats, config, dev: { hit } };

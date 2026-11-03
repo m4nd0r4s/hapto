@@ -36,7 +36,7 @@ mkdir -p demo/hapto
 wasm-bindgen target/wasm32-unknown-unknown/web/hapto_web.wasm \
   --out-dir demo/hapto --out-name hapto_wasm --target web --no-typescript
 mv demo/hapto/hapto_wasm_bg.wasm demo/hapto/hapto.wasm
-cp crates/hapto-web/js/hapto.js crates/hapto-web/js/hapto.css demo/hapto/
+cp crates/hapto-web/js/hapto.js crates/hapto-web/js/hapto.worker.js crates/hapto-web/js/hapto.css demo/hapto/
 
 # The runtime's test page draws the corpus, baked.
 mkdir -p demo/runtime/figures
