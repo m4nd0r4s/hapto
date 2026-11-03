@@ -27,6 +27,8 @@ fn native_digits_are_pinned() {
         std::fs::write(&pinned, &got).unwrap();
     }
     // A Windows checkout may have turned the newlines into CRLF.
-    let pinned = std::fs::read_to_string(pinned).unwrap().replace("\r\n", "\n");
+    let pinned = std::fs::read_to_string(pinned)
+        .unwrap()
+        .replace("\r\n", "\n");
     assert_eq!(got, pinned);
 }
