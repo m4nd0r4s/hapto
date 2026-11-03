@@ -306,12 +306,15 @@ impl Session {
             .map_err(|e| errors_json(&[e]))
     }
 
-    /// Findings of the last render (W602 and the like), for dev mode.
+    /// What loading found (W801 and the like) and what the last render
+    /// found (W602), for development mode.
     pub fn warnings(&self) -> Json {
         Json::Array(
             self.figure
+                .program
                 .warnings
                 .iter()
+                .chain(&self.figure.warnings)
                 .map(|e| serde_json::to_value(e).unwrap_or(Json::Null))
                 .collect(),
         )

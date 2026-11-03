@@ -685,7 +685,8 @@ impl Program {
         }
         let alt = c.template(&doc.alt, "/alt", &[]).unwrap_or_default();
         let mut errors = c.errors;
-        let warnings = c.warnings;
+        let mut warnings = doc.warnings.clone();
+        warnings.extend(c.warnings);
         errors.extend(module.check_unused_functions().into_iter().map(|e| {
             let path = e.path.clone().unwrap_or_default();
             let key = path.trim_start_matches("/let/").to_string();

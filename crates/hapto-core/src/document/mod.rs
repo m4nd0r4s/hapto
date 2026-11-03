@@ -111,6 +111,8 @@ pub struct Document {
     pub controls: Controls,
     /// Baked TeX layouts, written by `hapto bake` or a book build (§10.4).
     pub baked: Option<String>,
+    /// What reading found that is not wrong, such as a 1.0 spec (W801).
+    pub warnings: Vec<Error>,
 }
 
 /// Every top-level key of the format (§6.2).
@@ -122,10 +124,17 @@ pub const KEYS: &[&str] = &[
 /// Read a document; on failure, every error it has.
 pub fn read(text: &str) -> Result<Document, Vec<Error>> {
     let tree = crate::tree::parse(text).map_err(|e| vec![e])?;
-    let mut r = Reader::default();
+    let (tree, warnings) = crate::presets::expand(tree)?;
+    let mut r = Reader {
+        warnings,
+        ..Reader::default()
+    };
     let doc = read_tree(&mut r, &tree);
     match doc {
-        Some(doc) if r.errors.is_empty() => Ok(doc),
+        Some(mut doc) if r.errors.is_empty() => {
+            doc.warnings = r.warnings;
+            Ok(doc)
+        }
         _ => Err(r.errors),
     }
 }
@@ -139,18 +148,12 @@ fn read_tree(r: &mut Reader, tree: &Tree) -> Option<Document> {
     // The version decides how to read the rest (§6.4).
     match map.get("hapto") {
         None => {
-            let legacy = matches!(
-                map.get("kind").and_then(Tree::as_str),
-                Some("plot" | "columns")
+            // A 1.0 spec never gets here: the `legacy` preset read it.
+            r.error(
+                Error::new(codes::E407, "this document does not say which format it is")
+                    .hint("add `hapto: 2` at the top")
+                    .at_path("/"),
             );
-            let mut err = Error::new(codes::E407, "this document does not say which format it is")
-                .at_path("/");
-            err = if legacy {
-                err.hint("this looks like a 1.0 BookFigure spec, which the `legacy` preset reads (it lands with the page runtime)")
-            } else {
-                err.hint("add `hapto: 2` at the top")
-            };
-            r.error(err);
             return None;
         }
         Some(Tree::Number(n)) if n.as_f64() == Some(2.0) => {}
@@ -319,6 +322,7 @@ fn read_tree(r: &mut Reader, tree: &Tree) -> Option<Document> {
 
     let baked = text(r, "baked", "the baked layouts");
     Some(Document {
+        warnings: Vec::new(),
         baked,
         id,
         title,
@@ -816,8 +820,10 @@ marks:
     #[test]
     fn the_version_decides() {
         assert_eq!(codes_of("alt: a\nmarks: []"), ["E407"]);
+        // A 1.0 spec is read by the `legacy` preset, which names what is missing.
         let legacy = read("{\"kind\": \"plot\", \"curve\": \"x**2\"}").unwrap_err();
-        assert!(legacy[0].hint.as_deref().unwrap().contains("legacy"));
+        let missing: Vec<_> = legacy.iter().map(|e| e.path.as_deref().unwrap()).collect();
+        assert_eq!(missing, ["/variable", "/x_range", "/y_range"]);
         assert_eq!(codes_of("hapto: 3\nalt: a"), ["E403"]);
     }
 

@@ -21,6 +21,7 @@ pub mod interact;
 pub mod layout;
 pub mod marks;
 pub mod maths;
+pub mod presets;
 pub mod program;
 pub mod render;
 pub mod scene;

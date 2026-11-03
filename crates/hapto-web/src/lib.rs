@@ -288,7 +288,7 @@ impl Figure {
         self.session.render().map_err(throw)
     }
 
-    /// Findings of the last render, for development mode.
+    /// Warnings from loading and from the last render, for development mode.
     pub fn warnings(&self) -> JsValue {
         to_js(&self.session.warnings())
     }

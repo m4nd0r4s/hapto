@@ -110,3 +110,14 @@ test("the browser computes the native digits", () => {
     assert.deepEqual(f.evaluate(lets), JSON.parse(pinned[i]), `x = ${x}`);
   });
 });
+
+test("a 1.0 BookFigure spec loads through the legacy preset", () => {
+  const spec = { kind: "plot", variable: "x", at: 1, curve: "x**2 - x*(2)", tangent: true,
+    x_range: [-2, 4], y_range: [-2.35, 9.35], knob: [-2, 4] };
+  const f = Figure.load(JSON.stringify(spec), "json");
+  f.resize(480, f.heightFor(480), 1);
+  assert.equal(f.render().length, 480 * f.pixelHeight * 4);
+  assert.deepEqual(f.setState({ x: 3 }), { x: { value: 3, clamped: false } });
+  assert.match(f.evaluate().alt, /x = 3\.00, where its tangent has slope 4\.00/);
+  assert.deepEqual(f.warnings().map((w) => w.code), ["W801"]);
+});
