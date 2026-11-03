@@ -28,7 +28,13 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs exactly these on Linux, macOS and Windows.
+CI runs exactly these on Linux, macOS and Windows. A change to the browser
+surface (`crates/hapto-web`) also runs its Node tests, which need Node 20 or
+later:
+
+```bash
+scripts/test_web.sh
+```
 
 ## Conventions
 

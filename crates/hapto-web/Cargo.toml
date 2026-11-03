@@ -13,8 +13,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hapto-core.workspace = true
+hapto-expr.workspace = true
 kinemo-render.workspace = true
 serde_json.workspace = true
 # Pinned to the version kinemo pins, because the CLI that generates the
 # bindings has to match the crate exactly.
 wasm-bindgen = "=0.2.129"
+# Errors thrown as JS `Error`s with a `code`, and JSON handed over as objects.
+js-sys = "0.3.106"

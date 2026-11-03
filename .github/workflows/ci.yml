@@ -70,3 +70,12 @@ jobs:
       - run: cargo check -p hapto-expr --target wasm32-unknown-unknown
       # The page's build: hapto-core without typst (SPEC-2.0 §10.4).
       - run: cargo check -p hapto-web --target wasm32-unknown-unknown
+      # The 2.0 surface from JavaScript, and the native digits in wasm
+      # (SPEC-2.0 §15.10).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.129
+      - run: scripts/test_web.sh

@@ -116,6 +116,8 @@ pub struct Program {
     /// Per view: the x and y axis ranges.
     pub axes: Vec<(CompiledAxis, CompiledAxis)>,
     pub readouts: Vec<CompiledReadout>,
+    /// The alt text, interpolated with the state (§20).
+    pub alt: Vec<TextPiece>,
     pub warnings: Vec<Error>,
 }
 
@@ -366,7 +368,16 @@ impl Compiler<'_> {
         let highlight = m.common.highlight.as_ref().map(|s| self.style(s, &bound));
 
         let mut drag = Vec::new();
-        if let Some(Drag::Assign(assignments)) = &m.common.drag {
+        let automatic;
+        let assignments = match &m.common.drag {
+            Some(Drag::Assign(a)) => Some(a),
+            Some(Drag::Off) => None,
+            None => {
+                automatic = self.automatic_drag(m);
+                automatic.as_ref()
+            }
+        };
+        if let Some(assignments) = assignments {
             let mut ctx = bound.clone();
             ctx.extend(DRAG_CONTEXT.iter().map(|n| (n.to_string(), Type::Vec)));
             if m.kind == "vector" {
@@ -463,6 +474,27 @@ impl Compiler<'_> {
             deps,
             texts,
         })
+    }
+
+    /// A point placed exactly at a point value, or a vector whose tip is
+    /// one, drags that value relatively unless it says `drag: false` (§12.4).
+    fn automatic_drag(&self, m: &Mark) -> Option<Vec<(String, Formula)>> {
+        let main = m.main.formula()?;
+        let name = main.text.trim();
+        let i = self.state.index(name)?;
+        if !matches!(
+            self.state.decls()[i].kind,
+            crate::document::Kind::Point { .. }
+        ) {
+            return None;
+        }
+        let text = match m.kind {
+            "point" => "anchor0 + delta",
+            // The anchor is the tip, `at + v`; the value is the vector.
+            "vector" => "anchor0 + delta - at",
+            _ => return None,
+        };
+        Some(vec![(name.to_string(), Formula::new(text, &main.path))])
     }
 
     /// `tangent: x, of: f` names a function the figure declares.
@@ -651,6 +683,7 @@ impl Program {
                 });
             }
         }
+        let alt = c.template(&doc.alt, "/alt", &[]).unwrap_or_default();
         let mut errors = c.errors;
         let warnings = c.warnings;
         errors.extend(module.check_unused_functions().into_iter().map(|e| {
@@ -671,6 +704,7 @@ impl Program {
             marks,
             axes,
             readouts,
+            alt,
             warnings,
         })
     }

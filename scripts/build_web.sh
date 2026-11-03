@@ -26,8 +26,8 @@ cargo build -p hapto-web --target wasm32-unknown-unknown --profile web
 wasm-bindgen target/wasm32-unknown-unknown/web/hapto_web.wasm \
   --out-dir demo/pkg --target web --no-typescript
 
-# The scene the demo draws, which is also the test fixture.
-cp crates/hapto-core/tests/parabola.json demo/parabola.json
+# The figure the demo draws, with its TeX baked: the browser build has none.
+cargo run -q -p hapto-cli -- bake examples/corpus/b-tangent.yaml -o demo/tangent.json
 
 echo "built: demo/pkg/hapto_web_bg.wasm ($(du -h demo/pkg/hapto_web_bg.wasm | cut -f1))"
 

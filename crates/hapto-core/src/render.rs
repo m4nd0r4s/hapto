@@ -5,7 +5,7 @@ use hapto_expr::{Error, Value};
 use kinemo_render::raster::Image;
 
 use crate::layout::{draw_axes, frames, Frame};
-use crate::program::{Compiled, CompiledMark, Program, Slot};
+use crate::program::{Compiled, CompiledMark, Program, Slot, TextPiece};
 use crate::scene::{rasterise, Builder, Canvas};
 use crate::state::{Admitted, Input};
 use crate::theme::Theme;
@@ -17,7 +17,7 @@ pub const MAX_INSTANCES: usize = 5000;
 /// A figure: its program, its let cache, and nothing else that moves.
 pub struct Figure {
     pub program: Program,
-    cache: Cache,
+    pub(crate) cache: Cache,
     /// Findings of the last render, such as too many labels (W602).
     pub warnings: Vec<Error>,
 }
@@ -74,6 +74,59 @@ impl Figure {
         readouts(&mut ev, &self.program)
     }
 
+    /// The figure as SVG at the current state (print, §15.9).
+    pub fn svg(&mut self, canvas: Canvas, theme: &Theme) -> Result<String, Error> {
+        let scene = self.scene(canvas, theme)?;
+        Ok(crate::scene::svg(&scene, canvas))
+    }
+
+    /// The alt text, interpolated with the current state (§20).
+    pub fn alt(&mut self, theme: &Theme) -> Result<String, Error> {
+        let palette = |name: &str| theme.colour(name);
+        let values = self.program.state.values().to_vec();
+        let env = Env {
+            values: &values,
+            compute: &[],
+            palette: &palette,
+        };
+        let mut ev = Evaluation::new(&self.program.module, env, &mut self.cache, DEFAULT_FUEL);
+        let mut out = String::new();
+        for piece in &self.program.alt {
+            match piece {
+                TextPiece::Lit(l) => out.push_str(l),
+                TextPiece::Expr(c, spec) => {
+                    out.push_str(&marks::text::show(&eval(&mut ev, c, &[])?, spec.as_deref()))
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// A `let` at the current state, for prose that reads it (§15.4).
+    pub fn let_value(&mut self, name: &str, theme: &Theme) -> Result<Value, Error> {
+        let lets = self.program.module.lets();
+        let Some(i) = lets.iter().position(|l| l.name == name) else {
+            let names: Vec<&str> = lets.iter().map(|l| l.name.as_str()).collect();
+            let err = Error::new(
+                hapto_expr::error::codes::E301,
+                format!("this figure has no let named \"{name}\""),
+            );
+            return Err(match crate::tree::nearest(name, &names) {
+                Some(n) => err.hint(format!("did you mean `{n}`?")),
+                None => err.options(names.iter().copied()),
+            });
+        };
+        let palette = |name: &str| theme.colour(name);
+        let values = self.program.state.values().to_vec();
+        let env = Env {
+            values: &values,
+            compute: &[],
+            palette: &palette,
+        };
+        let mut ev = Evaluation::new(&self.program.module, env, &mut self.cache, DEFAULT_FUEL);
+        ev.let_value(i)
+    }
+
     pub fn scene(&mut self, canvas: Canvas, theme: &Theme) -> Result<kinemo_ir::Scene, Error> {
         let palette = |name: &str| theme.colour(name);
         let values = self.program.state.values().to_vec();
@@ -84,18 +137,8 @@ impl Figure {
         };
         let mut ev = Evaluation::new(&self.program.module, env, &mut self.cache, DEFAULT_FUEL);
         let mut b = Builder::new(canvas, theme.bg());
-        let mut ranges = Vec::new();
-        for (x, y) in &self.program.axes {
-            ranges.push((range(&mut ev, &x.range)?, range(&mut ev, &y.range)?));
-        }
+        let placed = place(&mut ev, &self.program, canvas)?;
         let doc = &self.program.doc;
-        let placed = frames(
-            &doc.views,
-            &doc.layout,
-            &ranges,
-            canvas.css_width,
-            canvas.css_height,
-        );
         for (view, frame) in doc.views.iter().zip(&placed) {
             draw_axes(&mut b, view, frame, theme);
         }
@@ -165,7 +208,27 @@ impl Figure {
     }
 }
 
-fn eval(ev: &mut Evaluation, c: &Compiled, bound: &[Value]) -> Result<Value, Error> {
+/// Every view placed on the canvas, its axis ranges at this state.
+pub(crate) fn place(
+    ev: &mut Evaluation,
+    program: &Program,
+    canvas: Canvas,
+) -> Result<Vec<Frame>, Error> {
+    let mut ranges = Vec::new();
+    for (x, y) in &program.axes {
+        ranges.push((range(ev, &x.range)?, range(ev, &y.range)?));
+    }
+    let doc = &program.doc;
+    Ok(frames(
+        &doc.views,
+        &doc.layout,
+        &ranges,
+        canvas.css_width,
+        canvas.css_height,
+    ))
+}
+
+pub(crate) fn eval(ev: &mut Evaluation, c: &Compiled, bound: &[Value]) -> Result<Value, Error> {
     ev.eval(&c.checked, bound).map_err(|e| e.at_path(&c.path))
 }
 
@@ -290,7 +353,7 @@ pub struct Target<'a> {
 }
 
 /// The product of a mark's repeat lists, as bound values per instance.
-fn instances(
+pub(crate) fn instances(
     ev: &mut Evaluation,
     m: &CompiledMark,
     outer: &[Value],

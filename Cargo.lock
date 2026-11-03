@@ -889,6 +889,8 @@ name = "hapto-web"
 version = "0.1.0"
 dependencies = [
  "hapto-core",
+ "hapto-expr",
+ "js-sys",
  "kinemo-render",
  "serde_json",
  "wasm-bindgen",

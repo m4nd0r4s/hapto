@@ -2,10 +2,18 @@
 //!
 //! The page owns the canvas and the controls. This holds the figure, takes a
 //! value when something sets one, and hands back the pixels. There is no
-//! clock here and nothing to play: `draw` is a pure function of the state.
+//! clock here and nothing to play: `render` is a pure function of the state.
+//!
+//! [`Figure`] is the 2.0 surface the page runtime's worker calls (SPEC-2.0
+//! §15.10); its logic is [`session::Session`]. [`BookFigure`] is 1.0's, kept
+//! until the `legacy` preset carries its specs (hapto-hl7.2).
+
+pub mod session;
 
 use hapto_core::v1::book::{columns, plot, Range};
-use hapto_core::v1::{Domain, Figure as CoreFigure, Knob, Size, State, Value};
+use hapto_core::v1::{Domain, Figure as CoreFigure, Size, Value};
+use serde_json::Value as Json;
+use session::Session;
 use wasm_bindgen::prelude::*;
 
 /// A figure a book page asks for by describing it.
@@ -178,88 +186,145 @@ impl BookFigure {
     }
 }
 
-/// A figure the page can touch.
+/// A JSON value as a JS object.
+fn to_js(v: &Json) -> JsValue {
+    js_sys::JSON::parse(&v.to_string()).unwrap_or(JsValue::NULL)
+}
+
+/// An error as a JS `Error` with the first error's `code`, `path` and
+/// `hint`, and every error under `errors` (§15.12).
+fn throw(e: Json) -> JsValue {
+    let message = e["message"].as_str().unwrap_or("hapto failed").to_string();
+    let code = e["code"].as_str().unwrap_or("");
+    let error = js_sys::Error::new(&format!("{code}: {message}"));
+    if let Json::Object(fields) = &e {
+        for (k, v) in fields {
+            if k != "message" {
+                let _ = js_sys::Reflect::set(&error, &JsValue::from_str(k), &to_js(v));
+            }
+        }
+    }
+    error.into()
+}
+
+/// A 2.0 figure: a document, its state, and the pixels it draws (§15.10).
+///
+/// ```js
+/// const figure = Figure.load(yamlText, "yaml");
+/// figure.resize(cssWidth, figure.heightFor(cssWidth), Math.min(devicePixelRatio, 2));
+/// figure.setState({ x: 3 });            // a slider, a drag, a word in the prose
+/// const { readouts, alt } = figure.evaluate([]);
+/// const rgba = figure.render();          // pixelWidth × pixelHeight × 4 bytes
+/// ```
 #[wasm_bindgen]
 pub struct Figure {
-    figure: CoreFigure,
-    state: State,
-    size: Size,
+    session: Session,
 }
 
 #[wasm_bindgen]
 impl Figure {
-    /// A figure for the scene `ir` (kinemo's JSON), drawing `width`×`height`.
-    ///
-    /// The scene must be built around one free signal — a bare
-    /// `k.signal(...)` that no object owns — which becomes the value named
-    /// `name`. See `hapto_core::v1::Figure::bind_free`.
-    #[wasm_bindgen(constructor)]
-    pub fn new(ir: &str, name: &str, width: u32, height: u32) -> Result<Figure, JsError> {
-        let mut figure = CoreFigure::from_json(ir).map_err(|e| JsError::new(&e))?;
-        figure.bind_free(name).map_err(|e| JsError::new(&e))?;
+    /// Read and compile a document. A document that does not make a figure
+    /// throws every error it has, never draws a blank.
+    pub fn load(text: &str, format: &str) -> Result<Figure, JsValue> {
         Ok(Figure {
-            figure,
-            state: State::new(),
-            size: Size { width, height },
+            session: Session::load(text, format).map_err(throw)?,
         })
     }
 
-    /// Declare a number the reader can move, with its bounds and where it starts.
-    ///
-    /// The step is the domain's, a hundredth of the range, so a control built
-    /// from `step()` is never coarse.
-    pub fn declare_number(&mut self, name: &str, low: f64, high: f64, at: f64) {
-        self.state.declare(Knob {
-            name: name.to_string(),
-            domain: Domain::Number {
-                low,
-                high,
-                step: None,
-            },
-            value: Value::number(at),
-            label: String::new(),
-        });
+    /// Every value with its domain, control and current value.
+    pub fn values(&self) -> JsValue {
+        to_js(&self.session.values())
     }
 
-    /// Set a value. This is the whole interface: a slider, a drag, or a word
-    /// in the prose beside the figure all call exactly this.
-    pub fn set(&mut self, name: &str, value: f64) -> Result<(), JsError> {
-        self.state
-            .set(name, Value::number(value))
-            .map_err(|e| JsError::new(&e))
+    /// Set values, `{ name: value }`: all admitted or none. Returns what
+    /// each became and whether it was clamped.
+    #[wasm_bindgen(js_name = setState)]
+    pub fn set_state(&mut self, state: JsValue) -> Result<JsValue, JsValue> {
+        let text = js_sys::JSON::stringify(&state)
+            .map(String::from)
+            .unwrap_or_default();
+        self.session
+            .set_state(&text)
+            .map(|v| to_js(&v))
+            .map_err(throw)
     }
 
-    /// What a value is now, after the domain had its say.
-    pub fn get(&self, name: &str) -> Option<f64> {
-        self.state.number(name)
+    /// Back to the defaults, and no focus.
+    pub fn reset(&mut self) {
+        self.session.reset();
     }
 
-    /// How finely a control for this value should move.
-    pub fn step(&self, name: &str) -> Option<f64> {
-        self.state
-            .knobs()
-            .find(|k| k.name == name)
-            .and_then(|k| k.domain.step())
+    /// The height to reserve for this CSS width.
+    #[wasm_bindgen(js_name = heightFor)]
+    pub fn height_for(&self, css_width: f64) -> f64 {
+        self.session.height_for(css_width)
     }
 
-    /// Draw frames at another size from now on (the canvas was resized).
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.size = Size { width, height };
+    pub fn resize(&mut self, css_width: f64, css_height: f64, dpr: f64) {
+        self.session.resize(css_width, css_height, dpr);
     }
 
-    pub fn width(&self) -> u32 {
-        self.size.width
+    #[wasm_bindgen(getter, js_name = pixelWidth)]
+    pub fn pixel_width(&self) -> u32 {
+        self.session.pixels().0
     }
 
-    pub fn height(&self) -> u32 {
-        self.size.height
+    #[wasm_bindgen(getter, js_name = pixelHeight)]
+    pub fn pixel_height(&self) -> u32 {
+        self.session.pixels().1
     }
 
-    /// The figure as the state has it now, as RGBA bytes, row by row.
-    pub fn draw(&self) -> Result<Vec<u8>, JsError> {
-        self.figure
-            .draw(&self.state, self.size)
-            .map(|image| image.rgba)
-            .map_err(|e| JsError::new(&e))
+    /// Readouts, the named lets, and the alt text, at this state.
+    pub fn evaluate(&mut self, lets: Option<Vec<String>>) -> Result<JsValue, JsValue> {
+        self.session
+            .evaluate(&lets.unwrap_or_default())
+            .map(|v| to_js(&v))
+            .map_err(throw)
+    }
+
+    /// The figure as RGBA bytes, `pixelWidth` × `pixelHeight`, row by row.
+    /// The worker puts them on its OffscreenCanvas or posts them.
+    pub fn render(&mut self) -> Result<Vec<u8>, JsValue> {
+        self.session.render().map_err(throw)
+    }
+
+    /// Findings of the last render, for development mode.
+    pub fn warnings(&self) -> JsValue {
+        to_js(&self.session.warnings())
+    }
+
+    /// The heat-map cell grid under the canvas, or `null`.
+    pub fn underlay(&self) -> JsValue {
+        to_js(&self.session.underlay())
+    }
+
+    #[wasm_bindgen(js_name = renderSVG)]
+    pub fn render_svg(&mut self) -> Result<String, JsValue> {
+        self.session.render_svg().map_err(throw)
+    }
+
+    /// `{ mark, drag, focusable }` under a pointer, or `null`.
+    /// `pointer` is the event's `pointerType`.
+    #[wasm_bindgen(js_name = hitTest)]
+    pub fn hit_test(&mut self, css_x: f64, css_y: f64, pointer: &str) -> Result<JsValue, JsValue> {
+        self.session
+            .hit_test(css_x, css_y, pointer)
+            .map(|v| to_js(&v))
+            .map_err(throw)
+    }
+
+    /// `phase` is `start`, `move`, `end` or `cancel`; `move` returns the
+    /// values set, as `setState` does.
+    pub fn drag(
+        &mut self,
+        mark: &str,
+        phase: &str,
+        css_x: f64,
+        css_y: f64,
+    ) -> Result<JsValue, JsValue> {
+        self.session
+            .drag(mark, phase, css_x, css_y)
+            .map(|v| to_js(&v))
+            .map_err(throw)
     }
 }
