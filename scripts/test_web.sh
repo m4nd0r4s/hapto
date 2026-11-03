@@ -14,4 +14,7 @@ out=target/hapto-web-node
 wasm-bindgen target/wasm32-unknown-unknown/web/hapto_web.wasm \
   --out-dir "$out" --target nodejs --no-typescript
 
+# The page runtime has no build step; at least it must parse.
+node --check crates/hapto-web/js/hapto.js
+
 HAPTO_WEB_PKG="$root/$out" node --test crates/hapto-web/tests/node/*.test.mjs

@@ -177,6 +177,23 @@ impl Session {
         }
     }
 
+    /// The document's id, title, caption and size rules (§7.6), for the
+    /// element's box and its id check.
+    pub fn meta(&self) -> Json {
+        let doc = &self.figure.program.doc;
+        json!({
+            "id": doc.id,
+            "title": doc.title,
+            "caption": doc.caption,
+            "size": {
+                "aspect": doc.size.aspect,
+                "min_height": doc.size.min_height,
+                "max_height": doc.size.max_height,
+                "phone_aspect": doc.size.phone_aspect,
+            },
+        })
+    }
+
     /// The height a box of this CSS width reserves (§15.3: no layout shift).
     pub fn height_for(&self, css_width: f64) -> f64 {
         hapto_core::layout::figure_height(&self.figure.program.doc.size, css_width)
@@ -422,6 +439,14 @@ readouts:
             .unwrap();
         assert_eq!(e["code"], "E301");
         assert!(e["errors"].as_array().is_some_and(|a| !a.is_empty()));
+    }
+
+    #[test]
+    fn meta_gives_the_box_its_shape() {
+        let m = session().meta();
+        assert_eq!(m["id"], Json::Null);
+        assert!((m["size"]["aspect"].as_f64().unwrap() - 16.0 / 9.0).abs() < 1e-12);
+        assert_eq!(m["size"]["min_height"], json!(240.0));
     }
 
     #[test]

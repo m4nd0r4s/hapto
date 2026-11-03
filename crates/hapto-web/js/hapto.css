@@ -1,0 +1,145 @@
+/* hapto.css — figures and their controls (SPEC-2.0 §15.7).
+ *
+ * Everything a book may want to change is a custom property; override them
+ * on :root or on one hapto-figure.
+ */
+
+hapto-figure {
+  --hapto-fg: #1c1b19;
+  --hapto-muted: #6b6762;
+  --hapto-bg: #fdfdfc;
+  --hapto-accent: #a0522d;
+  --hapto-highlight: #e69f00;
+  --hapto-font-text: system-ui, sans-serif;
+  --hapto-font-math: "Latin Modern Math", serif;
+  --hapto-radius: 8px;
+  --hapto-control-gap: 0.5rem 1rem;
+
+  display: block;
+  margin: 1.5rem 0;
+  color: var(--hapto-fg);
+  font-family: var(--hapto-font-text);
+  font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) hapto-figure {
+    --hapto-fg: #e8e6e3;
+    --hapto-muted: #9b958a;
+    --hapto-bg: #1a1918;
+    --hapto-accent: #d98a5f;
+    --hapto-highlight: #ffc04d;
+  }
+}
+html[data-theme="dark"] hapto-figure {
+  --hapto-fg: #e8e6e3;
+  --hapto-muted: #9b958a;
+  --hapto-bg: #1a1918;
+  --hapto-accent: #d98a5f;
+  --hapto-highlight: #ffc04d;
+}
+
+/* The box is reserved before anything loads: 16:9 and the default height
+ * bounds of §7.6 unless the fallback image or the document says otherwise.
+ * Before hapto.js has run, the element itself holds the box, with its
+ * fallback filling it, so upgrading it moves nothing. */
+hapto-figure:not(:defined) {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 240px;
+  max-height: 560px;
+}
+hapto-figure:not(:defined) > script {
+  display: none;
+}
+hapto-figure:not(:defined) > img.hapto-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.hapto-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 240px;
+  max-height: 560px;
+  border-radius: var(--hapto-radius);
+  overflow: hidden;
+  background: var(--hapto-bg);
+}
+.hapto-canvas,
+.hapto-stage > .hapto-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.hapto-canvas[hidden],
+.hapto-stage > .hapto-fallback[hidden] {
+  display: none;
+}
+
+.hapto-readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hapto-control-gap);
+  margin-top: 0.6rem;
+  color: var(--hapto-muted);
+}
+.hapto-readouts:empty {
+  display: none;
+}
+.hapto-readout-value {
+  color: var(--hapto-fg);
+  font-variant-numeric: tabular-nums;
+  margin-left: 0.4em;
+}
+
+.hapto-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--hapto-control-gap);
+  margin-top: 0.75rem;
+}
+.hapto-controls:empty {
+  display: none;
+}
+.hapto-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--hapto-muted);
+}
+.hapto-control input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--hapto-accent);
+}
+.hapto-control-value {
+  min-width: 4.5em;
+  color: var(--hapto-fg);
+  font-variant-numeric: tabular-nums;
+}
+.hapto-choice button {
+  font: inherit;
+  color: var(--hapto-fg);
+  background: none;
+  border: 1px solid var(--hapto-muted);
+  border-radius: calc(var(--hapto-radius) / 2);
+  padding: 0.15em 0.6em;
+  margin-right: 0.3em;
+  cursor: pointer;
+}
+.hapto-choice button[aria-pressed="true"] {
+  border-color: var(--hapto-accent);
+  color: var(--hapto-accent);
+}
+
+.hapto-error {
+  margin-top: 0.5rem;
+  color: var(--hapto-muted);
+  font-size: 13px;
+}

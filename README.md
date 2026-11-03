@@ -83,6 +83,10 @@ reason the library exists — a figure the prose can drive. The page talks to
 the 2.0 wasm surface (`Figure.load`, `setState`, `evaluate`, `render`,
 `hitTest`, `drag`; SPEC-2.0 §15.10) by hand, where `hapto.js` will.
 
+<http://localhost:8750/runtime/> is the page runtime's own test page:
+thirty `<hapto-figure>` elements from the corpus, loaded as they come near
+the screen (SPEC-2.0 §15), through `hapto/hapto.js` and `hapto/hapto.css`.
+
 Each redraw takes under 10 ms, so a pointer never outruns it. Needs the
 `wasm32-unknown-unknown` target and `wasm-bindgen` at the pinned version; the
 script says so if either is missing.

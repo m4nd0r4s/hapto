@@ -14,6 +14,7 @@ pub const E406: Code = Code("E406"); // mixing `view` and `views`
 pub const E407: Code = Code("E407"); // missing `hapto:` version
 pub const E408: Code = Code("E408"); // a mark with zero or several kind keys
 pub const E409: Code = Code("E409"); // mark references an unknown view
+pub const E410: Code = Code("E410"); // the element's id is not the document's
 
 // E5xx — values and domains
 pub const E501: Code = Code("E501"); // default outside range
@@ -88,6 +89,11 @@ pub const CATALOGUE: &[Entry] = &[
         code: E409,
         title: "mark references an unknown view",
         example: "marks: [ { point: '[0, 0]', view: nowhere } ]",
+    },
+    Entry {
+        code: E410,
+        title: "the element's id is not the document's",
+        example: "<hapto-figure id=\"tangent\" src=\"secant.yaml\">   # whose id: is secant",
     },
     Entry {
         code: E501,

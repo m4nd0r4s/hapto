@@ -254,6 +254,11 @@ impl Figure {
         self.session.reset();
     }
 
+    /// The document's id, title, caption and size rules.
+    pub fn meta(&self) -> JsValue {
+        to_js(&self.session.meta())
+    }
+
     /// The height to reserve for this CSS width.
     #[wasm_bindgen(js_name = heightFor)]
     pub fn height_for(&self, css_width: f64) -> f64 {

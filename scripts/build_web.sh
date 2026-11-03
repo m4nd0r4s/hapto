@@ -27,9 +27,27 @@ wasm-bindgen target/wasm32-unknown-unknown/web/hapto_web.wasm \
   --out-dir demo/pkg --target web --no-typescript
 
 # The figure the demo draws, with its TeX baked: the browser build has none.
-cargo run -q -p hapto-cli -- bake examples/corpus/b-tangent.yaml -o demo/tangent.json
+cargo build -q -p hapto-cli
+target/debug/hapto bake examples/corpus/b-tangent.yaml -o demo/tangent.json
 
-echo "built: demo/pkg/hapto_web_bg.wasm ($(du -h demo/pkg/hapto_web_bg.wasm | cut -f1))"
+# The page runtime as a page loads it (SPEC-2.0 §15.1): hapto.js, hapto.css,
+# the module's glue and hapto.wasm, side by side.
+mkdir -p demo/hapto
+wasm-bindgen target/wasm32-unknown-unknown/web/hapto_web.wasm \
+  --out-dir demo/hapto --out-name hapto_wasm --target web --no-typescript
+mv demo/hapto/hapto_wasm_bg.wasm demo/hapto/hapto.wasm
+cp crates/hapto-web/js/hapto.js crates/hapto-web/js/hapto.css demo/hapto/
+
+# The runtime's test page draws the corpus, baked.
+mkdir -p demo/runtime/figures
+for f in examples/corpus/*.yaml; do
+  n=$(basename "$f" .yaml)
+  target/debug/hapto bake "$f" -o "demo/runtime/figures/$n.json"
+  # The fallback a book would ship: the default state as SVG (§15.9).
+  target/debug/hapto render "$f" -o "demo/runtime/figures/$n.svg" --width 720
+done
+
+echo "built: demo/pkg/hapto_web_bg.wasm ($(du -h demo/pkg/hapto_web_bg.wasm | cut -f1)), demo/hapto/"
 
 if [ "${1:-}" != "--build" ]; then
   echo "serving http://localhost:8750/ — Ctrl-C to stop"

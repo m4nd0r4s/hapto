@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hapto.js — the runtime's test page</title>
+<link rel="stylesheet" href="../hapto/hapto.css">
+<script type="module" src="../hapto/hapto.js"></script>
+<style>
+  body { margin: 0; display: flex; justify-content: center; padding: 3rem 1rem 50vh;
+    font: 17px/1.7 Georgia, serif; background: #fdfdfc; color: #1c1b19; }
+  @media (prefers-color-scheme: dark) { body { background: #15140f; color: #e8e4dc; } }
+  main { width: 100%; max-width: 46rem; }
+  p { margin: 2.5rem 0 1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>hapto.js</h1>
+  <p>The runtime's test page (SPEC-2.0 §15.3): thirty figures from the
+  corpus, each reserving its box from its fallback image, loading near the
+  viewport and releasing its canvas far from it. <code>hapto.stats()</code>
+  in the console counts them.</p>
+
+  <p>One written inline, with no file and no baking (it has no TeX), and
+  starting from <code>state="k=2"</code>:</p>
+  <hapto-figure id="inline" state="k=2" eager>
+    <script type="application/hapto+yaml">
+hapto: 2
+id: inline
+alt: "A sine wave of frequency {k}."
+values:
+  - { name: k, type: number, range: [1, 5], default: 1, step: integer, label: frequency }
+  - { name: shape, type: choice, options: [sin, cos], default: sin }
+view: { x: { range: [0, 6.3] }, y: { range: [-1.2, 1.2] } }
+marks:
+  - { function: "if shape == 'sin' then sin(k * x) else cos(k * x)", var: x }
+readouts:
+  - { id: period, label: period, value: "2 * pi / k", format: .3f }
+    </script>
+  </hapto-figure>
+
+  <p>Figure 1 of 30 reads <code>b-tangent</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-tangent.json">
+    <img class="hapto-fallback" src="figures/b-tangent.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 2 of 30 reads <code>a-domains</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-domains.json">
+    <img class="hapto-fallback" src="figures/a-domains.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 3 of 30 reads <code>a-rotation</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-rotation.json">
+    <img class="hapto-fallback" src="figures/a-rotation.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 4 of 30 reads <code>b-complex-multiply</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-complex-multiply.json">
+    <img class="hapto-fallback" src="figures/b-complex-multiply.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 5 of 30 reads <code>b-inscribed-angle</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-inscribed-angle.json">
+    <img class="hapto-fallback" src="figures/b-inscribed-angle.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 6 of 30 reads <code>b-projection</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-projection.json">
+    <img class="hapto-fallback" src="figures/b-projection.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 7 of 30 reads <code>b-tangent</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-tangent.json">
+    <img class="hapto-fallback" src="figures/b-tangent.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 8 of 30 reads <code>a-domains</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-domains.json">
+    <img class="hapto-fallback" src="figures/a-domains.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 9 of 30 reads <code>a-rotation</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-rotation.json">
+    <img class="hapto-fallback" src="figures/a-rotation.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 10 of 30 reads <code>b-complex-multiply</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-complex-multiply.json">
+    <img class="hapto-fallback" src="figures/b-complex-multiply.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 11 of 30 reads <code>b-inscribed-angle</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-inscribed-angle.json">
+    <img class="hapto-fallback" src="figures/b-inscribed-angle.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 12 of 30 reads <code>b-projection</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-projection.json">
+    <img class="hapto-fallback" src="figures/b-projection.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 13 of 30 reads <code>b-tangent</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-tangent.json">
+    <img class="hapto-fallback" src="figures/b-tangent.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 14 of 30 reads <code>a-domains</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-domains.json">
+    <img class="hapto-fallback" src="figures/a-domains.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 15 of 30 reads <code>a-rotation</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-rotation.json">
+    <img class="hapto-fallback" src="figures/a-rotation.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 16 of 30 reads <code>b-complex-multiply</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-complex-multiply.json">
+    <img class="hapto-fallback" src="figures/b-complex-multiply.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 17 of 30 reads <code>b-inscribed-angle</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-inscribed-angle.json">
+    <img class="hapto-fallback" src="figures/b-inscribed-angle.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 18 of 30 reads <code>b-projection</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-projection.json">
+    <img class="hapto-fallback" src="figures/b-projection.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 19 of 30 reads <code>b-tangent</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-tangent.json">
+    <img class="hapto-fallback" src="figures/b-tangent.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 20 of 30 reads <code>a-domains</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-domains.json">
+    <img class="hapto-fallback" src="figures/a-domains.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 21 of 30 reads <code>a-rotation</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-rotation.json">
+    <img class="hapto-fallback" src="figures/a-rotation.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 22 of 30 reads <code>b-complex-multiply</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-complex-multiply.json">
+    <img class="hapto-fallback" src="figures/b-complex-multiply.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 23 of 30 reads <code>b-inscribed-angle</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-inscribed-angle.json">
+    <img class="hapto-fallback" src="figures/b-inscribed-angle.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 24 of 30 reads <code>b-projection</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-projection.json">
+    <img class="hapto-fallback" src="figures/b-projection.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 25 of 30 reads <code>b-tangent</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-tangent.json">
+    <img class="hapto-fallback" src="figures/b-tangent.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 26 of 30 reads <code>a-domains</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-domains.json">
+    <img class="hapto-fallback" src="figures/a-domains.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 27 of 30 reads <code>a-rotation</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/a-rotation.json">
+    <img class="hapto-fallback" src="figures/a-rotation.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 28 of 30 reads <code>b-complex-multiply</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-complex-multiply.json">
+    <img class="hapto-fallback" src="figures/b-complex-multiply.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 29 of 30 reads <code>b-inscribed-angle</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-inscribed-angle.json">
+    <img class="hapto-fallback" src="figures/b-inscribed-angle.svg" width="720" height="405" alt="">
+  </hapto-figure>
+  <p>Figure 30 of 30 reads <code>b-projection</code>. It loads when it comes within a
+  viewport of the screen, and gives its canvas back when it is three viewports away.</p>
+  <hapto-figure src="figures/b-projection.json">
+    <img class="hapto-fallback" src="figures/b-projection.svg" width="720" height="405" alt="">
+  </hapto-figure>
+
+  <p>A figure whose document is broken keeps its box and says so:</p>
+  <hapto-figure id="broken">
+    <script type="application/hapto+yaml">
+hapto: 2
+alt: a
+view: { x: { range: [0, 1] }, y: { range: [0, 1] } }
+marks: [ { point: "[q, 0]" } ]
+    </script>
+  </hapto-figure>
+
+  <p>And one whose element and document disagree about its id:</p>
+  <hapto-figure id="not-tangent" src="figures/b-tangent.json"></hapto-figure>
+</main>
+</body>
+</html>
